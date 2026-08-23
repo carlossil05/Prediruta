@@ -1,0 +1,176 @@
+Project PREDIRUTA_ORIGINAL {
+  database_type: 'Fuente CSV'
+}
+
+Table ACCIDENTE {
+  X decimal
+  Y decimal
+  OBJECTID bigint [pk]
+  FORMULARIO varchar [not null, unique]
+  CODIGO_ACCIDENTE varchar [not null, unique]
+  FECHA_OCURRENCIA_ACC timestamp
+  HORA_OCURRENCIA_ACC time
+  ANO_OCURRENCIA_ACC integer
+  MES_OCURRENCIA_ACC varchar
+  DIA_OCURRENCIA_ACC varchar
+  DIRECCION varchar
+  GRAVEDAD varchar
+  CLASE_ACC varchar
+  LOCALIDAD varchar
+  MUNICIPIO varchar
+  FECHA_HORA_ACC timestamp
+  LATITUD decimal
+  LONGITUD decimal
+  CIV varchar
+  PK_CALZADA varchar
+  BARRIO varchar
+  MVINOMBRE varchar
+  DISTANCIA_VIA decimal
+}
+
+Table VM_ACC_VEHICULO {
+  OBJECTID bigint [pk]
+  FORMULARIO varchar [not null]
+  PLACA varchar
+  CODIGO_VEHICULO varchar [not null]
+  COD_CLASE varchar
+  CLASE varchar
+  SERVICIO varchar
+  MODALIDAD varchar
+  ENFUGA varchar
+  CODIGO varchar
+}
+
+Table VM_ACC_ACTOR_VIAL {
+  OBJECTID bigint [pk]
+  FORMULARIO varchar [not null]
+  CODIGO_ACCIDENTADO varchar [not null]
+  FECHA_OCURRENCIA timestamp
+  CODIGO_VICTIMA varchar
+  CODIGO_VEHICULO varchar
+  CONDICION varchar
+  ESTADO varchar
+  MUERTE_POSTERIOR varchar
+  FECHA_POSTERIOR_MUERTE timestamp
+  GENERO varchar
+  FECHA_NACIMIENTO timestamp
+  EDAD integer
+  CODIGO varchar
+  CONDICION_A varchar
+}
+
+Table LESIONADO {
+  X decimal
+  Y decimal
+  OBJECTID bigint [pk]
+  CODIGO_ACCIDENTADO varchar [not null]
+  FORMULARIO varchar [not null]
+  FECHA_OCURRENCIA_ACC timestamp
+  HORA_OCURRENCIA_ACC time
+  ANO_OCURRENCIA_ACC integer
+  MES_OCURRENCIA_ACC varchar
+  DIA_OCURRENCIA_ACC varchar
+  FECHA_HORA_ACC timestamp
+  DIRECCION varchar
+  CLASE_ACC varchar
+  LOCALIDAD varchar
+  CODIGO_VEHICULO varchar
+  CONDICION varchar
+  CONDICION_A varchar
+  GENERO varchar
+  EDAD integer
+
+  indexes {
+    (FORMULARIO, CODIGO_ACCIDENTADO) [unique]
+  }
+}
+
+Table MUERTO {
+  X decimal
+  Y decimal
+  OBJECTID bigint [pk]
+  CODIGO_ACCIDENTADO varchar [not null]
+  FORMULARIO varchar [not null]
+  FECHA_OCURRENCIA_ACC timestamp
+  HORA_OCURRENCIA_ACC time
+  ANO_OCURRENCIA_ACC integer
+  MES_OCURRENCIA_ACC varchar
+  DIA_OCURRENCIA_ACC varchar
+  FECHA_HORA_ACC timestamp
+  DIRECCION varchar
+  CLASE_ACC varchar
+  LOCALIDAD varchar
+  CODIGO_VEHICULO varchar
+  CONDICION varchar
+  CONDICION_A varchar
+  MUERTE_POSTERIOR varchar
+  FECHA_POSTERIOR_MUERTE timestamp
+  GENERO varchar
+  EDAD integer
+
+  indexes {
+    (FORMULARIO, CODIGO_ACCIDENTADO) [unique]
+  }
+}
+
+Table VM_ACC_CAUSA {
+  OBJECTID bigint [pk]
+  FORMULARIO varchar [not null]
+  CODIGO_ACCIDENTE varchar [not null]
+  CODIGO_VEHICULO varchar [not null]
+  CODIGO_CAUSA varchar [not null]
+  NOMBRE varchar
+  TIPO varchar
+  DESCRIPCION2 varchar
+  TIPO_CAUSA varchar
+  CODIGO varchar
+  CODIGO_AC_VH varchar
+}
+
+Table VM_ACC_VIA {
+  OBJECTID bigint [pk]
+  CODIGO_VIA varchar
+  ES_PRINCIPAL integer
+  CODIGO_ACCIDENTE varchar [not null]
+  FORMULARIO varchar [not null]
+  GEOMETRICAA varchar
+  GEOMETRICAB varchar
+  GEOMETRICAC varchar
+  UTILIZACION varchar
+  CALZADAS integer
+  CARRILES integer
+  SUPERFICIE_RODADURA varchar
+  OTRA_SUPERFICIE_RODADURA varchar
+  ESTADO varchar
+  CONDICIONES varchar
+  OTRA_CONDICION varchar
+  ILUMINACION_ARTIFICIAL varchar
+  ESTADO_ILUMINACION varchar
+  AGENTE varchar
+  SEMAFORO varchar
+  VISUALVIA varchar
+  OTRO_VISUAL varchar
+  VISUAL_NORMAL varchar
+  OTRA_SENALES_VERT varchar
+  OTRO_SENALES_HORZ varchar
+  OTRO_REDUCTOR_VELOCIDAD varchar
+  OTRO_DELINEADOR varchar
+  OTRO_VISIBILIDAD varchar
+  CODIGO varchar
+}
+
+// Relaciones principales declaradas por la estructura lógica de la fuente.
+Ref: ACCIDENTE.FORMULARIO < VM_ACC_VEHICULO.FORMULARIO
+Ref: ACCIDENTE.FORMULARIO < VM_ACC_ACTOR_VIAL.FORMULARIO
+Ref: ACCIDENTE.FORMULARIO < LESIONADO.FORMULARIO
+Ref: ACCIDENTE.FORMULARIO < MUERTO.FORMULARIO
+Ref: ACCIDENTE.FORMULARIO < VM_ACC_CAUSA.FORMULARIO
+Ref: ACCIDENTE.CODIGO_ACCIDENTE < VM_ACC_CAUSA.CODIGO_ACCIDENTE
+Ref: VM_ACC_VEHICULO.(FORMULARIO, CODIGO_VEHICULO) < VM_ACC_ACTOR_VIAL.(FORMULARIO, CODIGO_VEHICULO)
+Ref: VM_ACC_VEHICULO.(FORMULARIO, CODIGO_VEHICULO) < LESIONADO.(FORMULARIO, CODIGO_VEHICULO)
+Ref: VM_ACC_VEHICULO.(FORMULARIO, CODIGO_VEHICULO) < MUERTO.(FORMULARIO, CODIGO_VEHICULO)
+Ref: VM_ACC_VEHICULO.(FORMULARIO, CODIGO_VEHICULO) < VM_ACC_CAUSA.(FORMULARIO, CODIGO_VEHICULO)
+Ref: VM_ACC_ACTOR_VIAL.(FORMULARIO, CODIGO_ACCIDENTADO) - LESIONADO.(FORMULARIO, CODIGO_ACCIDENTADO)
+Ref: VM_ACC_ACTOR_VIAL.(FORMULARIO, CODIGO_ACCIDENTADO) - MUERTO.(FORMULARIO, CODIGO_ACCIDENTADO)
+Ref: ACCIDENTE.CODIGO_ACCIDENTE < VM_ACC_VIA.CODIGO_ACCIDENTE
+

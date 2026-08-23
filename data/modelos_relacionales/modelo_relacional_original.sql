@@ -1,0 +1,192 @@
+CREATE TABLE "ACCIDENTE" (
+  "X" decimal,
+  "Y" decimal,
+  "OBJECTID" bigint PRIMARY KEY,
+  "FORMULARIO" varchar UNIQUE NOT NULL,
+  "CODIGO_ACCIDENTE" varchar UNIQUE NOT NULL,
+  "FECHA_OCURRENCIA_ACC" timestamp,
+  "HORA_OCURRENCIA_ACC" time,
+  "ANO_OCURRENCIA_ACC" integer,
+  "MES_OCURRENCIA_ACC" varchar,
+  "DIA_OCURRENCIA_ACC" varchar,
+  "DIRECCION" varchar,
+  "GRAVEDAD" varchar,
+  "CLASE_ACC" varchar,
+  "LOCALIDAD" varchar,
+  "MUNICIPIO" varchar,
+  "FECHA_HORA_ACC" timestamp,
+  "LATITUD" decimal,
+  "LONGITUD" decimal,
+  "CIV" varchar,
+  "PK_CALZADA" varchar,
+  "BARRIO" varchar,
+  "MVINOMBRE" varchar,
+  "DISTANCIA_VIA" decimal
+);
+
+CREATE TABLE "VM_ACC_VEHICULO" (
+  "OBJECTID" bigint PRIMARY KEY,
+  "FORMULARIO" varchar NOT NULL,
+  "PLACA" varchar,
+  "CODIGO_VEHICULO" varchar NOT NULL,
+  "COD_CLASE" varchar,
+  "CLASE" varchar,
+  "SERVICIO" varchar,
+  "MODALIDAD" varchar,
+  "ENFUGA" varchar,
+  "CODIGO" varchar
+);
+
+CREATE TABLE "VM_ACC_ACTOR_VIAL" (
+  "OBJECTID" bigint PRIMARY KEY,
+  "FORMULARIO" varchar NOT NULL,
+  "CODIGO_ACCIDENTADO" varchar NOT NULL,
+  "FECHA_OCURRENCIA" timestamp,
+  "CODIGO_VICTIMA" varchar,
+  "CODIGO_VEHICULO" varchar,
+  "CONDICION" varchar,
+  "ESTADO" varchar,
+  "MUERTE_POSTERIOR" varchar,
+  "FECHA_POSTERIOR_MUERTE" timestamp,
+  "GENERO" varchar,
+  "FECHA_NACIMIENTO" timestamp,
+  "EDAD" integer,
+  "CODIGO" varchar,
+  "CONDICION_A" varchar
+);
+
+CREATE TABLE "LESIONADO" (
+  "X" decimal,
+  "Y" decimal,
+  "OBJECTID" bigint PRIMARY KEY,
+  "CODIGO_ACCIDENTADO" varchar NOT NULL,
+  "FORMULARIO" varchar NOT NULL,
+  "FECHA_OCURRENCIA_ACC" timestamp,
+  "HORA_OCURRENCIA_ACC" time,
+  "ANO_OCURRENCIA_ACC" integer,
+  "MES_OCURRENCIA_ACC" varchar,
+  "DIA_OCURRENCIA_ACC" varchar,
+  "FECHA_HORA_ACC" timestamp,
+  "DIRECCION" varchar,
+  "CLASE_ACC" varchar,
+  "LOCALIDAD" varchar,
+  "CODIGO_VEHICULO" varchar,
+  "CONDICION" varchar,
+  "CONDICION_A" varchar,
+  "GENERO" varchar,
+  "EDAD" integer
+);
+
+CREATE TABLE "MUERTO" (
+  "X" decimal,
+  "Y" decimal,
+  "OBJECTID" bigint PRIMARY KEY,
+  "CODIGO_ACCIDENTADO" varchar NOT NULL,
+  "FORMULARIO" varchar NOT NULL,
+  "FECHA_OCURRENCIA_ACC" timestamp,
+  "HORA_OCURRENCIA_ACC" time,
+  "ANO_OCURRENCIA_ACC" integer,
+  "MES_OCURRENCIA_ACC" varchar,
+  "DIA_OCURRENCIA_ACC" varchar,
+  "FECHA_HORA_ACC" timestamp,
+  "DIRECCION" varchar,
+  "CLASE_ACC" varchar,
+  "LOCALIDAD" varchar,
+  "CODIGO_VEHICULO" varchar,
+  "CONDICION" varchar,
+  "CONDICION_A" varchar,
+  "MUERTE_POSTERIOR" varchar,
+  "FECHA_POSTERIOR_MUERTE" timestamp,
+  "GENERO" varchar,
+  "EDAD" integer
+);
+
+CREATE TABLE "VM_ACC_CAUSA" (
+  "OBJECTID" bigint PRIMARY KEY,
+  "FORMULARIO" varchar NOT NULL,
+  "CODIGO_ACCIDENTE" varchar NOT NULL,
+  "CODIGO_VEHICULO" varchar NOT NULL,
+  "CODIGO_CAUSA" varchar NOT NULL,
+  "NOMBRE" varchar,
+  "TIPO" varchar,
+  "DESCRIPCION2" varchar,
+  "TIPO_CAUSA" varchar,
+  "CODIGO" varchar,
+  "CODIGO_AC_VH" varchar
+);
+
+CREATE TABLE "VM_ACC_VIA" (
+  "OBJECTID" bigint PRIMARY KEY,
+  "CODIGO_VIA" varchar,
+  "ES_PRINCIPAL" integer,
+  "CODIGO_ACCIDENTE" varchar NOT NULL,
+  "FORMULARIO" varchar NOT NULL,
+  "GEOMETRICAA" varchar,
+  "GEOMETRICAB" varchar,
+  "GEOMETRICAC" varchar,
+  "UTILIZACION" varchar,
+  "CALZADAS" integer,
+  "CARRILES" integer,
+  "SUPERFICIE_RODADURA" varchar,
+  "OTRA_SUPERFICIE_RODADURA" varchar,
+  "ESTADO" varchar,
+  "CONDICIONES" varchar,
+  "OTRA_CONDICION" varchar,
+  "ILUMINACION_ARTIFICIAL" varchar,
+  "ESTADO_ILUMINACION" varchar,
+  "AGENTE" varchar,
+  "SEMAFORO" varchar,
+  "VISUALVIA" varchar,
+  "OTRO_VISUAL" varchar,
+  "VISUAL_NORMAL" varchar,
+  "OTRA_SENALES_VERT" varchar,
+  "OTRO_SENALES_HORZ" varchar,
+  "OTRO_REDUCTOR_VELOCIDAD" varchar,
+  "OTRO_DELINEADOR" varchar,
+  "OTRO_VISIBILIDAD" varchar,
+  "CODIGO" varchar
+);
+
+CREATE UNIQUE INDEX ON "LESIONADO" ("FORMULARIO", "CODIGO_ACCIDENTADO");
+
+CREATE UNIQUE INDEX ON "MUERTO" ("FORMULARIO", "CODIGO_ACCIDENTADO");
+
+COMMENT ON TABLE "ACCIDENTE" IS 'Tabla principal de accidentes. FORMULARIO relaciona la mayoría de tablas temáticas; CODIGO_ACCIDENTE se utiliza en CAUSA y parcialmente en VIA.';
+
+COMMENT ON TABLE "VM_ACC_VEHICULO" IS 'Vehículos involucrados. FORMULARIO y CODIGO_VEHICULO forman la llave lógica del vehículo dentro del accidente, aunque la fuente original contiene repeticiones de esa combinación; PLACA es información sensible presente en la fuente.';
+
+COMMENT ON TABLE "VM_ACC_ACTOR_VIAL" IS 'Actores involucrados en los accidentes. FORMULARIO y CODIGO_ACCIDENTADO funcionan como llave lógica, pero presentan repeticiones en la fuente. CODIGO_VEHICULO es opcional para actores como peatones.';
+
+COMMENT ON TABLE "LESIONADO" IS 'Vista o extracto de actores lesionados. Repite información del accidente y se relaciona con ACTOR_VIAL mediante FORMULARIO y CODIGO_ACCIDENTADO.';
+
+COMMENT ON TABLE "MUERTO" IS 'Vista o extracto de actores fallecidos. Repite información del accidente y se relaciona con ACTOR_VIAL mediante FORMULARIO y CODIGO_ACCIDENTADO.';
+
+COMMENT ON TABLE "VM_ACC_CAUSA" IS 'Causas registradas para el accidente o para uno de sus vehículos. La combinación FORMULARIO, CODIGO_VEHICULO y CODIGO_CAUSA se repite en la fuente original, por lo que OBJECTID es la única llave física declarada.';
+
+COMMENT ON TABLE "VM_ACC_VIA" IS 'Condiciones de la vía. Puede haber varias filas por accidente. CODIGO_ACCIDENTE coincide con ACCIDENTE solo en parte de la fuente; FORMULARIO usa una codificación distinta y no debe declararse como llave foránea directa.';
+
+ALTER TABLE "VM_ACC_VEHICULO" ADD FOREIGN KEY ("FORMULARIO") REFERENCES "ACCIDENTE" ("FORMULARIO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_ACTOR_VIAL" ADD FOREIGN KEY ("FORMULARIO") REFERENCES "ACCIDENTE" ("FORMULARIO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "LESIONADO" ADD FOREIGN KEY ("FORMULARIO") REFERENCES "ACCIDENTE" ("FORMULARIO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "MUERTO" ADD FOREIGN KEY ("FORMULARIO") REFERENCES "ACCIDENTE" ("FORMULARIO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_CAUSA" ADD FOREIGN KEY ("FORMULARIO") REFERENCES "ACCIDENTE" ("FORMULARIO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_CAUSA" ADD FOREIGN KEY ("CODIGO_ACCIDENTE") REFERENCES "ACCIDENTE" ("CODIGO_ACCIDENTE") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_ACTOR_VIAL" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_VEHICULO") REFERENCES "VM_ACC_VEHICULO" ("FORMULARIO", "CODIGO_VEHICULO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "LESIONADO" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_VEHICULO") REFERENCES "VM_ACC_VEHICULO" ("FORMULARIO", "CODIGO_VEHICULO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "MUERTO" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_VEHICULO") REFERENCES "VM_ACC_VEHICULO" ("FORMULARIO", "CODIGO_VEHICULO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_CAUSA" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_VEHICULO") REFERENCES "VM_ACC_VEHICULO" ("FORMULARIO", "CODIGO_VEHICULO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "LESIONADO" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_ACCIDENTADO") REFERENCES "VM_ACC_ACTOR_VIAL" ("FORMULARIO", "CODIGO_ACCIDENTADO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "MUERTO" ADD FOREIGN KEY ("FORMULARIO", "CODIGO_ACCIDENTADO") REFERENCES "VM_ACC_ACTOR_VIAL" ("FORMULARIO", "CODIGO_ACCIDENTADO") DEFERRABLE INITIALLY IMMEDIATE;
+
+ALTER TABLE "VM_ACC_VIA" ADD FOREIGN KEY ("CODIGO_ACCIDENTE") REFERENCES "ACCIDENTE" ("CODIGO_ACCIDENTE") DEFERRABLE INITIALLY IMMEDIATE;
