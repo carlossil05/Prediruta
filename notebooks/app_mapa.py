@@ -1,19 +1,114 @@
 # crea un archivo de python llamado 'app_mapa.py' y guarda todo el texto de abajo dentro de él".
 
-# Librerias
+#Librerias requeridas
 import streamlit as st
-import streamlit.components.v1 as components
+import googlemaps
+import polyline
+import folium
+from streamlit_folium import folium_static
+import random
+from datetime import datetime
+import os
+from dotenv import load_dotenv
 
-#Titulo y layout de la página de streamlit en el navegador
-st.set_page_config(page_title="Mi Mapa", layout="wide")
+# Cargar las variables del archivo .env
+load_dotenv()
 
-# Titulo.
-st.title("Prueba streamlit Google Maps")
+# Se obtiene la variable 'API_Google' del env
+api_key = os.getenv("API_Google")
 
-# html del mapa de google
-mapa_html = """
-<iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d127255.43285098926!2d-74.19532884144369!3d4.648283717282869!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8e3f9bfd2da6cb29%3A0x239d635520a33914!2zQm9nb3TDoQ!5e0!3m2!1ses-419!2sco!4v1700000000000!5m2!1ses-419!2sco" width="100%" height="450" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-"""
+# Titulos y descripción de la página
+st.set_page_config(page_title="PrediRuta", layout="wide")
+st.title("PrediRuta")
+st.markdown(""" 
+PrediRuta es un sistema predictivo que permite estimar el nivel de riesgo vial 
+asociado a una ruta dentro de Bogotá
+""")
 
-# se usa el compoenente html de streamlit y el mapa
-components.html(mapa_html, height=470)
+# --- Memoria del mapa---
+if "mapa_calculado" not in st.session_state:
+    st.session_state.mapa_calculado = None
+if "detalles_ruta" not in st.session_state:
+    st.session_state.detalles_ruta = ""
+
+# Barra lateral para ingreso de información del usuario
+st.sidebar.header("Parámetros de la Ruta")
+origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colombia, Bogotá")
+destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
+hora_salida = st.sidebar.time_input("Hora de salida", datetime.now().time())
+
+# Función para simular el índice de riesgo mientras se define modelo
+def obtener_color_riesgo():
+
+    # Indice de riesgo aleatorio entre 0 y 1
+    riesgo = random.random()
+
+    if riesgo < 0.33:
+        return "green", riesgo  # Riesgo Bajo
+    elif riesgo < 0.66:
+        return "orange", riesgo # Riesgo Medio
+    else:
+        return "red", riesgo    # Riesgo Alto
+
+
+# --- BOTÓN DE CÁLCULO ---
+if st.sidebar.button("Calcular Ruta y Riesgo"):
+
+    #Si no hay API key
+    if not api_key:
+        st.sidebar.error("⚠️ La API Key es obligatoria para calcular la ruta.")
+    else:
+
+        #Spinner mientras calcula la ruta
+        with st.spinner('Calculando ruta...'):
+
+            try:
+
+                #usa la libreria de googlemaps y la clave  de la API
+                gmaps = googlemaps.Client(key=api_key)
+
+                #
+                departure_time = datetime.combine(datetime.now().date(), hora_salida)
+
+                directions_result = gmaps.directions(
+                    origen, destino, mode="driving", departure_time=departure_time
+                )
+
+                if directions_result:
+                    route = directions_result[0]
+                    legs = route['legs'][0]
+
+                    start_lat = legs['start_location']['lat']
+                    start_lng = legs['start_location']['lng']
+
+                    # Creamos el mapa
+                    m = folium.Map(location=[start_lat, start_lng], zoom_start=13)
+
+                    # Marcadores
+                    folium.Marker([start_lat, start_lng], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
+                    folium.Marker([legs['end_location']['lat'], legs['end_location']['lng']], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
+
+                    # Tramos (Riesgos)
+                    for step in legs['steps']:
+                        path = polyline.decode(step['polyline']['points'])
+                        color, riesgo = obtener_color_riesgo()
+                        folium.PolyLine(locations=path, color=color, weight=6, opacity=0.8, tooltip=f"Riesgo: {riesgo:.2f}").add_to(m)
+
+                    # GUARDAMOS EL RESULTADO EN LA MEMORIA
+                    st.session_state.mapa_calculado = m
+                    st.session_state.detalles_ruta = f"**Distancia total:** {legs['distance']['text']} | **Duración estimada:** {legs['duration']['text']}"
+
+                else:
+                    st.warning("No se encontró una ruta válida.")
+
+            except Exception as e:
+                st.error(f"Error al conectar con Google Maps: {e}")
+
+# --- Render del mapa ---
+
+if st.session_state.mapa_calculado is not None:
+    folium_static(st.session_state.mapa_calculado, width=900, height=500)
+    st.success(st.session_state.detalles_ruta)
+else:
+    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11)
+    folium_static(mapa_por_defecto, width=900, height=500)
