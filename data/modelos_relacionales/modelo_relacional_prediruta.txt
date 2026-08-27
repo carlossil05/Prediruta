@@ -4,36 +4,22 @@ Project PREDIRUTA {
 }
 
 Table ACCIDENTE {
-  ACCIDENTE_ID varchar [pk]
-  FORMULARIO varchar [not null, unique]
+  ACCIDENTE_ID integer [pk]
   FECHA_HORA timestamp [not null]
   LATITUD decimal(9,6) [not null]
   LONGITUD decimal(9,6) [not null]
-  DIRECCION varchar
-  GRAVEDAD varchar
   CLASE_ACCIDENTE varchar
   LOCALIDAD varchar
-  BARRIO varchar
-  CIV varchar
-  PK_CALZADA varchar
-  VIA_CERCANA varchar
-  DISTANCIA_VIA decimal
 
-  CLIMA_ID varchar
+  CLIMA_ID integer
 
-  ANIO integer [not null]
-  MES integer [not null]
-  DIA_SEMANA integer [not null]
-  HORA integer [not null]
-  ES_FIN_SEMANA boolean [not null]
   OBJETIVO_GRAVE boolean [not null]
 
   Note: 'Una fila por accidente válido dentro del alcance definido para PrediRuta.'
 }
 
 Table VIA {
-  ACCIDENTE_ID varchar [pk]
-  CODIGO_VIA varchar
+  ACCIDENTE_ID integer [pk]
   GEOMETRIA_PLANTA varchar
   GEOMETRIA_TERRENO varchar
   GEOMETRIA_SECCION varchar
@@ -45,78 +31,55 @@ Table VIA {
   CONDICION_VIA varchar
   ILUMINACION_ARTIFICIAL varchar
   SEMAFORO varchar
-  VISIBILIDAD_VIA varchar
 
   Note: 'Una vía representativa por accidente, seleccionada mediante una regla determinística.'
 }
 
 Table CLIMA {
-  CLIMA_ID varchar [pk]
+  CLIMA_ID integer [pk]
   FECHA_HORA_CLIMA timestamp [not null]
-
-  LATITUD_CELDA decimal(9,6) [not null]
-  LONGITUD_CELDA decimal(9,6) [not null]
-
-  LATITUD_MODELO decimal(9,6) [not null]
-  LONGITUD_MODELO decimal(9,6) [not null]
-  ELEVACION_MODELO_M decimal
 
   TEMPERATURA_2M decimal
   HUMEDAD_RELATIVA_2M decimal
   SENSACION_TERMICA decimal
   PRECIPITACION decimal
   LLUVIA decimal
-  CODIGO_CLIMA integer
   NUBOSIDAD decimal
   PRESION_SUPERFICIE decimal
   VELOCIDAD_VIENTO_10M decimal
   DIRECCION_VIENTO_10M decimal
 
-  MODELO varchar [not null]
-  FUENTE varchar [not null]
-
-  Note: 'Una observación meteorológica única por modelo, ubicación y hora. Se utiliza ERA5 antes de 2017 y ECMWF IFS desde 2017.'
+  Note: 'Una observación meteorológica única relacionada con ACCIDENTE mediante CLIMA_ID.'
 }
 
 Table VEHICULO {
-  ACCIDENTE_ID varchar [not null]
-  CODIGO_VEHICULO varchar [not null]
+  ACCIDENTE_ID integer [not null]
+  VEHICULO_ID integer [pk]
   CLASE varchar
   SERVICIO varchar
-
-  indexes {
-    (ACCIDENTE_ID, CODIGO_VEHICULO) [pk]
-  }
 
   Note: 'Vehículos asociados a los accidentes utilizables. La placa no se conserva.'
 }
 
 Table ACTOR_VIAL {
-  ACCIDENTE_ID varchar [not null]
-  CODIGO_ACTOR varchar [not null]
-  CODIGO_VEHICULO varchar
+  ACCIDENTE_ID integer [not null]
+  ACTOR_ID integer [pk]
+  VEHICULO_ID integer
   CONDICION varchar
   ESTADO varchar
   GENERO varchar
   EDAD integer
 
-  indexes {
-    (ACCIDENTE_ID, CODIGO_ACTOR) [pk]
-  }
-
   Note: 'Actores asociados a los accidentes utilizables de forma anonimizada.'
 }
 
 Table CAUSA {
-  ACCIDENTE_ID varchar [not null]
-  CODIGO_VEHICULO varchar
+  CAUSA_ID integer [pk]
+  ACCIDENTE_ID integer [not null]
+  VEHICULO_ID integer
   CODIGO_CAUSA varchar [not null]
   NOMBRE varchar
   TIPO varchar
-
-  indexes {
-    (ACCIDENTE_ID, CODIGO_VEHICULO, CODIGO_CAUSA) [unique]
-  }
 
   Note: 'Causas asociadas al accidente o a uno de sus vehículos.'
 }
@@ -130,3 +93,7 @@ Ref: ACCIDENTE.ACCIDENTE_ID < VEHICULO.ACCIDENTE_ID
 Ref: ACCIDENTE.ACCIDENTE_ID < ACTOR_VIAL.ACCIDENTE_ID
 
 Ref: ACCIDENTE.ACCIDENTE_ID < CAUSA.ACCIDENTE_ID
+
+Ref: VEHICULO.VEHICULO_ID < ACTOR_VIAL.VEHICULO_ID
+
+Ref: VEHICULO.VEHICULO_ID < CAUSA.VEHICULO_ID
