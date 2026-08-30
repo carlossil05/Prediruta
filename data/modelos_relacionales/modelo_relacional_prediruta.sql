@@ -4,7 +4,6 @@ CREATE TABLE "ACCIDENTE" (
   "LATITUD" decimal(9,6) NOT NULL,
   "LONGITUD" decimal(9,6) NOT NULL,
   "CLASE_ACCIDENTE" varchar,
-  "LOCALIDAD" varchar,
   "CLIMA_ID" integer,
   "OBJETIVO_GRAVE" boolean NOT NULL
 );

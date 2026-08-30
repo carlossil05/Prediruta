@@ -9,8 +9,6 @@ Table ACCIDENTE {
   LATITUD decimal(9,6) [not null]
   LONGITUD decimal(9,6) [not null]
   CLASE_ACCIDENTE varchar
-  LOCALIDAD varchar
-
   CLIMA_ID integer
 
   OBJETIVO_GRAVE boolean [not null]
