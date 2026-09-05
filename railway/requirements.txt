@@ -1,0 +1,20 @@
+# Frontend (Streamlit & Visualización)
+streamlit
+googlemaps
+polyline
+folium
+streamlit-folium
+python-dotenv
+
+# Backend (FastAPI & Servidor web)
+fastapi
+uvicorn
+pydantic
+
+# Machine Learning & Datos
+xgboost
+scikit-learn
+pandas
+numpy
+joblib
+scipy
