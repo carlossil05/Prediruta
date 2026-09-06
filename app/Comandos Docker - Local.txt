@@ -1,13 +1,20 @@
-#Construir imagen de Docker
-docker build -t prediruta-app .
+# 1. Construir la imagen de la API
+docker build -f Dockerfile.api -t prediruta-api .
 
-#Ejecutar streamlit y la API con el ar chivo .env local
-docker run -d -p 8501:8501 -p 8000:8000 --env-file .env --name prediruta_contenedor prediruta-app
+docker run -d -p 8000:8000 --name api_local prediruta-api
+
+# 2. Construir la imagen de Streamlit
+docker build -f Dockerfile.front -t prediruta-front .
+
+docker run -d -p 8501:8501 -e GOOGLE_APIKEY="YOUR_API_KEY" -e API_URL="http://host.docker.internal:8000/predict" --name front_local prediruta-front
+
 
 #Acceder a la app de streamlit
 http://localhost:8501
 
+
 #Acceder a la API
+http://localhost:8000/docs
 
 #Detener Docker
-docker stop prediruta_contenedor; docker rm prediruta_contenedor
+docker stop api_local front_local; docker rm api_local front_local
