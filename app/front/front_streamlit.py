@@ -9,13 +9,11 @@ from streamlit_folium import folium_static
 import random
 from datetime import datetime
 import os
-from dotenv import load_dotenv
 
-# Cargar las variables del archivo .env
-load_dotenv()
 
 # Se obtiene la variable 'API_Google' del env
-api_key = os.getenv("API_Google")
+api_key = os.getenv("GOOGLE_APIKEY")
+
 
 # Titulos y descripción de la página
 st.set_page_config(page_title="PrediRuta", layout="wide")

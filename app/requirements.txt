@@ -10,6 +10,7 @@ python-dotenv
 fastapi
 uvicorn
 pydantic
+dill
 
 # Machine Learning & Datos
 xgboost
