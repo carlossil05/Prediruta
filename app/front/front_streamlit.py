@@ -77,13 +77,18 @@ if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
                 start_loc = resumen["start_location"]
                 end_loc = resumen["end_location"]
 
-                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], zoom_start=9, tiles="CartoDB dark_matter")
+                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], tiles="CartoDB positron")
                 folium.Marker([start_loc["lat"], start_loc["lng"]], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
                 folium.Marker([end_loc["lat"], end_loc["lng"]], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
 
                 tramos_tabla = []
+                todos_los_puntos = []
 
                 for t in tramos:
+
+                    # Guardar puntos para el cálculo del zoom automático
+                    todos_los_puntos.extend(t["puntos_polyline"])
+
                     # Dibujar tramo en el mapa
                     folium.PolyLine(
                         locations=t["puntos_polyline"],
@@ -105,6 +110,14 @@ if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
                         "Riesgo": f"{t['probabilidad']:.2%}",
                         "Nivel": t["nivel_riesgo"]
                     })
+
+                # Calcular los límites para ajustar el mapa automáticamente
+                if todos_los_puntos:
+                    min_lat = min(p[0] for p in todos_los_puntos)
+                    max_lat = max(p[0] for p in todos_los_puntos)
+                    min_lon = min(p[1] for p in todos_los_puntos)
+                    max_lon = max(p[1] for p in todos_los_puntos)
+                    m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
 
                 # Guardar en memoria de Streamlit
                 st.session_state.mapa_calculado = m
@@ -128,5 +141,5 @@ if st.session_state.mapa_calculado is not None:
     st.dataframe(df_tramos, use_container_width=True)
 
 else:
-    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=9, tiles="CartoDB dark_matter")
+    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11, tiles="CartoDB positron")
     st_folium(mapa_por_defecto, use_container_width=True, height=500, returned_objects=[])
