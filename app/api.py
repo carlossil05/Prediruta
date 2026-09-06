@@ -122,8 +122,8 @@ class PrediccionRutaInput(BaseModel):
     }
 
 # --- CONSTANTES DE NEGOCIO Y CONFIGURACIÓN ---
-UMBRAL_RIESGO_BAJO = 0.35
-UMBRAL_RIESGO_MEDIO = 0.65
+UMBRAL_RIESGO_BAJO = 0.3
+UMBRAL_RIESGO_MEDIO = 0.6
 
 CONFIG_RIESGO = {
     "BAJO": {"nivel": "Bajo","color": "green"},
