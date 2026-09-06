@@ -77,7 +77,9 @@ if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
                 start_loc = resumen["start_location"]
                 end_loc = resumen["end_location"]
 
-                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], tiles="CartoDB positron")
+                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], 
+                               tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                               attr='Esri')
                 folium.Marker([start_loc["lat"], start_loc["lng"]], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
                 folium.Marker([end_loc["lat"], end_loc["lng"]], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
 
@@ -141,5 +143,7 @@ if st.session_state.mapa_calculado is not None:
     st.dataframe(df_tramos, use_container_width=True)
 
 else:
-    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11, tiles="CartoDB positron")
+    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11, 
+                               tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                               attr='Esri')
     st_folium(mapa_por_defecto, use_container_width=True, height=500, returned_objects=[])
