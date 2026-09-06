@@ -11,6 +11,7 @@ from datetime import datetime
 import os
 import math
 import pandas as pd
+from datetime import datetime, timedelta
 
 
 # Se obtiene la variable 'API_Google' del env
@@ -173,9 +174,24 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
 
                     tramos_info = []
 
+                    # Duración total calculada por Google en segundos
+                    duracion_total_segundos = legs['duration']['value']
+
+                    # Estimación de tiempo por tramo (en segundos)
+                    num_tramos = len(tramos_segmentados)
+                    segundos_por_tramo = duracion_total_segundos / num_tramos if num_tramos > 0 else 0
+
+                    hora_acumulada = departure_time
+                    tramos_info = []
+
                     # Trazar cada tramo individualizado
                     for idx, tramo_pts in enumerate(tramos_segmentados, start=1):
                         color, riesgo, nivel = obtener_color_riesgo()
+
+                        # Hora de inicio y fin del tramo
+                        hora_inicio_tramo = hora_acumulada
+                        hora_fin_tramo = hora_acumulada + timedelta(seconds=segundos_por_tramo)
+                        hora_acumulada = hora_fin_tramo  # Siguiente tramo inicia donde termina este
                         
                         # Dibujar en mapa
                         folium.PolyLine(
@@ -192,6 +208,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
                         
                         tramos_info.append({
                             "Tramo": f"Tramo {idx}",
+                            "Hora Paso": f"{hora_inicio_tramo.strftime('%H:%M')} - {hora_fin_tramo.strftime('%H:%M')}",
                             "Origen (Lat, Lng)": f"{lat_inicio:.4f}, {lng_inicio:.4f}",
                             "Destino (Lat, Lng)": f"{lat_fin:.4f}, {lng_fin:.4f}",
                             "Riesgo": f"{riesgo:.2%}",
