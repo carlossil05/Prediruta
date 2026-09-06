@@ -32,7 +32,7 @@ if "tramos_info" not in st.session_state:
 
 # --- PARÁMETROS DE ENTRADA ---
 st.sidebar.header("Parámetros de la Ruta")
-origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colombia, Bogotá")
+origen = st.sidebar.text_input("Punto de Inicio", "Terminal del sur, Bogotá")
 destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
 
 # Inputs de Fecha y Hora
@@ -77,7 +77,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
                 start_loc = resumen["start_location"]
                 end_loc = resumen["end_location"]
 
-                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], zoom_start=13)
+                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], zoom_start=9, tiles="CartoDB dark_matter")
                 folium.Marker([start_loc["lat"], start_loc["lng"]], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
                 folium.Marker([end_loc["lat"], end_loc["lng"]], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
 
@@ -120,7 +120,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
 
 # --- RENDERING DE LA INTERFAZ ---
 if st.session_state.mapa_calculado is not None:
-    st_folium(st.session_state.mapa_calculado, width=900, height=500, returned_objects=[])
+    st_folium(st.session_state.mapa_calculado, use_container_width=True, height=500, returned_objects=[])
     st.success(st.session_state.detalles_ruta)
 
     st.subheader("📋 Detalle de Tramos de la Ruta")
@@ -128,5 +128,5 @@ if st.session_state.mapa_calculado is not None:
     st.dataframe(df_tramos, use_container_width=True)
 
 else:
-    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11)
-    st_folium(mapa_por_defecto, width=900, height=500, returned_objects=[])
+    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=9, tiles="CartoDB dark_matter")
+    st_folium(mapa_por_defecto, use_container_width=True, height=500, returned_objects=[])
