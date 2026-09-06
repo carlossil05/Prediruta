@@ -18,8 +18,8 @@ app = FastAPI(
 )
 
 # Constantes de negocio
-DISTANCIA_TRAMO_KM = 1.5  # Modifica este valor con el resultado de tu script de centroides
-UMBRAL_BAJO, UMBRAL_MEDIO = 0.35, 0.65
+DISTANCIA_TRAMO_KM = 3.2  # Se calcula como raiz(AreaUrbanaBogota/Clusters)*2=raiz(384/150)*2=3.2
+UMBRAL_BAJO, UMBRAL_MEDIO = 0.3, 0.6
 
 # Carga de modelo
 MODEL_PATH = os.path.join("modelo", "modelo_ocurrencia_temporal.joblib")
@@ -143,3 +143,70 @@ def procesar_y_predecir_ruta(data: SolicitudRuta):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    @app.get("/test-mlp", tags=["Pruebas"])
+def test_modelo_mlp():
+    """
+    Endpoint de prueba precargado con 3 tramos de ejemplo para verificar 
+    que el modelo MLP de 11 variables realiza la inferencia correctamente.
+    """
+
+    datos_prueba = [
+        {
+            "tramo_id": "Tramo 1 - Mañana Despejada",
+            "ZONA_CIUDAD": 1, "MES": 9, "DIA_SEMANA": 6, "HORA": 8,
+            "TEMPERATURA_2M": 14.5, "PRECIPITACION": 0.0, "NUBOSIDAD": 20.0,
+            "PRESION_SUPERFICIE": 750.0, "VELOCIDAD_VIENTO_10M": 5.0,
+            "DIRECCION_VIENTO_10M_SIN": 0.0, "DIRECCION_VIENTO_10M_COS": 1.0
+        },
+        {
+            "tramo_id": "Tramo 2 - Tarde Lluviosa",
+            "ZONA_CIUDAD": 4, "MES": 9, "DIA_SEMANA": 6, "HORA": 15,
+            "TEMPERATURA_2M": 18.2, "PRECIPITACION": 5.5, "NUBOSIDAD": 85.0,
+            "PRESION_SUPERFICIE": 748.5, "VELOCIDAD_VIENTO_10M": 15.0,
+            "DIRECCION_VIENTO_10M_SIN": 0.7071, "DIRECCION_VIENTO_10M_COS": -0.7071
+        },
+        {
+            "tramo_id": "Tramo 3 - Noche Fría y Ventosa",
+            "ZONA_CIUDAD": 8, "MES": 9, "DIA_SEMANA": 6, "HORA": 23,
+            "TEMPERATURA_2M": 9.5, "PRECIPITACION": 0.0, "NUBOSIDAD": 10.0,
+            "PRESION_SUPERFICIE": 752.0, "VELOCIDAD_VIENTO_10M": 25.0,
+            "DIRECCION_VIENTO_10M_SIN": -1.0, "DIRECCION_VIENTO_10M_COS": 0.0
+        }
+    ]
+
+    df_input = pd.DataFrame(datos_prueba)
+    
+    columnas_modelo = [
+        'ZONA_CIUDAD', 'MES', 'DIA_SEMANA', 'HORA', 
+        'TEMPERATURA_2M', 'PRECIPITACION', 'NUBOSIDAD', 
+        'PRESION_SUPERFICIE', 'VELOCIDAD_VIENTO_10M', 
+        'DIRECCION_VIENTO_10M_SIN', 'DIRECCION_VIENTO_10M_COS'
+    ]
+
+    try:
+        probabilidades = model.predict_proba(df_input[columnas_modelo])[:, 1]
+        
+        resultados = []
+        for idx, row in df_input.iterrows():
+            prob = float(probabilidades[idx])
+            riesgo = clasificar_riesgo(prob)
+            
+            resultados.append({
+                "escenario": row["tramo_id"],
+                "entradas": row[columnas_modelo].to_dict(),
+                "prediccion": {
+                    "probabilidad": round(prob, 4),
+                    "nivel_riesgo": riesgo["nivel"],
+                    "color": riesgo["color"]
+                }
+            })
+            
+        return {
+            "status": "ok", 
+            "mensaje": "Inferencia MLP exitosa", 
+            "resultados": resultados
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en la inferencia de prueba: {str(e)}")
