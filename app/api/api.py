@@ -7,9 +7,9 @@ from fastapi import FastAPI, HTTPException
 from zoneinfo import ZoneInfo
 
 # Importaciones locales
-from schemas import SolicitudRuta
-from utils import segmentar_ruta
-from services import obtener_zona_mas_cercana, obtener_clima_tramo, obtener_direcciones_gmaps
+from api.schemas import SolicitudRuta
+from api.utils import segmentar_ruta
+from api.services import obtener_zona_mas_cercana, obtener_clima_tramo, obtener_direcciones_gmaps
 
 app = FastAPI(
     title="API PrediRuta - Riesgo Vial Bogotá",
