@@ -37,8 +37,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
             payload = {
                 "origen": origen,
                 "destino": destino,
-                "hora_salida": hora_salida.strftime("%H:%M"),
-                "distancia_tramo_km": distancia_tramo_km
+                "hora_salida": hora_salida.strftime("%H:%M")
             }
 
             response = requests.post(API_URL, json=payload, timeout=30)
@@ -65,7 +64,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
                         color=t["color"],
                         weight=6,
                         opacity=0.8,
-                        tooltip=f"Tramo {t['tramo']} ({distancia_tramo_km} km) - Hora: {t['hora_paso']} | Riesgo {t['nivel_riesgo']}: {t['probabilidad']:.2%}"
+                        tooltip=f"Tramo {t['tramo']} - Hora: {t['hora_paso']} | Riesgo {t['nivel_riesgo']}: {t['probabilidad']:.2%}"
                     ).add_to(m)
 
                     # Estructurar fila para la tabla
