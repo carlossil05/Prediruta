@@ -12,6 +12,7 @@ import os
 import math
 import pandas as pd
 from datetime import datetime, timedelta
+import requests
 
 
 # Se obtiene la variable 'API_Google' del env
@@ -129,6 +130,46 @@ def obtener_color_riesgo():
     else:
         return "red", riesgo, "Alto"
 
+import requests
+
+def obtener_clima_tramo(lat, lng, hora_paso):
+    """
+    Obtiene sensación térmica, lluvia y velocidad del viento a 10m
+    para las coordenadas y hora indicadas desde Open-Meteo.
+    """
+    try:
+        url = "https://api.open-meteo.com/v1/forecast"
+        params = {
+            "latitude": lat,
+            "longitude": lng,
+            "hourly": "apparent_temperature,rain,wind_speed_10m",
+            "forecast_days": 1,
+            "timezone": "America/Bogota"
+        }
+        res = requests.get(url, params=params, timeout=5)
+        data = res.json()
+
+        if "hourly" in data:
+            # Encuentra el índice de hora más cercano a la hora de paso
+            hora_str = hora_paso.strftime("%Y-%m-%dT%H:00")
+            
+            if hora_str in data["hourly"]["time"]:
+                idx = data["hourly"]["time"].index(hora_str)
+            else:
+                idx = 0  # Fallback a la hora más cercana disponible
+
+            sensacion_termica = data["hourly"]["apparent_temperature"][idx] # °C
+            lluvia = data["hourly"]["rain"][idx]                           # mm
+            viento = data["hourly"]["wind_speed_10m"][idx]                 # km/h
+
+            return sensacion_termica, lluvia, viento
+            
+    except Exception:
+        pass
+
+    # Valores por defecto en caso de falla de conexión
+    return 18.0, 0.0, 10.0
+
 
 # --- BOTÓN DE CÁLCULO ---
 if st.sidebar.button("Calcular Ruta y Riesgo"):
@@ -206,11 +247,16 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
                         lat_inicio, lng_inicio = tramo_pts[0]
                         lat_fin, lng_fin = tramo_pts[-1]
                         
+                        # Consulta de clima para las coordenadas del tramo
+                        sens_termica, lluvia, viento = obtener_clima_tramo(lat_inicio, lng_inicio, hora_inicio_tramo)
+                        
                         tramos_info.append({
                             "Tramo": f"Tramo {idx}",
                             "Hora Paso": f"{hora_inicio_tramo.strftime('%H:%M')} - {hora_fin_tramo.strftime('%H:%M')}",
                             "Origen (Lat, Lng)": f"{lat_inicio:.4f}, {lng_inicio:.4f}",
-                            "Destino (Lat, Lng)": f"{lat_fin:.4f}, {lng_fin:.4f}",
+                            "Sensación Térmica (°C)": f"{sens_termica:.1f}",
+                            "Lluvia (mm)": f"{lluvia:.1f}",
+                            "Viento (km/h)": f"{viento:.1f}",
                             "Riesgo": f"{riesgo:.2%}",
                             "Nivel": nivel
                         })
