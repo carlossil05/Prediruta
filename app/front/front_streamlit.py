@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from streamlit_folium import st_folium
 
 # --- CONFIGURACIÓN DE URL Y PÁGINA ---
-API_URL = os.getenv("API_URL", "https://prediruta-api-carlos.up.railway.app/predict")
+API_URL = os.getenv("API_URL", "https://prediruta-api-pruebas.up.railway.app/predict")
 
 st.set_page_config(page_title="PrediRuta", layout="wide")
 st.title("PrediRuta")
