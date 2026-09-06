@@ -22,6 +22,7 @@ Prediruta/
 │   └── carga_csv_supabase.ipynb
 ├── modelo/
 │   ├── modelo_ocurrencia_accidente.ipynb
+│   ├── modelo_ocurrencia_accidente_temporal.ipynb
 │   ├── modelo_estado_victima.ipynb
 │   ├── modelo_clase_accidente.ipynb
 │   └── modelos_produccion/          # Modelo de estado y metadatos
@@ -68,7 +69,7 @@ El notebook [`data/construccion_dataset.ipynb`](data/construccion_dataset.ipynb)
 
 | Archivo | Unidad de observación | Uso principal |
 |---|---|---|
-| `DATASET_OCURRENCIA.csv` | Zona, mes, día de la semana y hora | Modelo de ocurrencia |
+| `DATASET_OCURRENCIA.csv` | Año, zona, mes, día de la semana y hora | Modelo temporal de ocurrencia |
 | `DATASET_EVENTOS.csv` | Accidente | Análisis de eventos y objetivos por accidente |
 | `TABLA_COMPLETA_MODELADO.csv` | Actor involucrado en un accidente | Modelos de estado y clase de accidente |
 | `DICCIONARIO_CATEGORIAS.csv` | Categoría codificada | Interpretación reproducible de variables categóricas |
@@ -80,13 +81,14 @@ La tabla completa de modelado consolida en un solo archivo la información neces
 `DATASET_OCURRENCIA.csv` no genera negativos desplazando las fechas de los accidentes. El procedimiento actual es:
 
 1. proyectar los accidentes en `EPSG:3116` y consolidarlos espacial y temporalmente;
-2. construir 150 zonas geográficas mediante `MiniBatchKMeans`;
-3. resumir los positivos por `ZONA_CIUDAD`, `MES`, `DIA_SEMANA` y `HORA`;
-4. generar las `150 × 12 × 7 × 24 = 302.400` combinaciones posibles;
-5. asignar `OCURRIO_ACCIDENTE = 0` a las combinaciones sin registros históricos;
-6. incorporar la climatología correspondiente a cada zona y patrón temporal.
+2. diagnosticar el número de grupos y ajustar 150 zonas con accidentes hasta 2020 para evitar fuga temporal;
+3. asignar los eventos posteriores a esas mismas zonas mediante `predict`;
+4. resumir los positivos por `ANIO`, `ZONA_CIUDAD`, `MES`, `DIA_SEMANA` y `HORA`;
+5. generar `150 × 12 × 7 × 24 = 302.400` combinaciones para cada año completo;
+6. asignar `OCURRIO_ACCIDENTE = 0` a las combinaciones sin registros durante ese año;
+7. incorporar el clima promedio del mismo año, zona y patrón temporal.
 
-Un cero significa que no se encontró un accidente para esa combinación recurrente en el histórico disponible. No representa la observación de una zona sin accidente en una fecha futura concreta. La salida debe interpretarse como recurrencia histórica y no como una probabilidad temporal perfectamente calibrada.
+Los años incompletos se excluyen para no convertir periodos todavía no observados en falsos negativos. Un cero significa que no se encontró un accidente durante ese año para la combinación analizada. La salida no equivale a una probabilidad individual por viaje porque no se dispone de exposición vehicular por celda-hora.
 
 ## Modelos
 
@@ -101,6 +103,10 @@ pd.read_csv('../data/data_procesada/modelado/DATASET_OCURRENCIA.csv')
 ```
 
 Las rutas de Kaggle se conservan comentadas como referencia.
+
+[`modelo/modelo_ocurrencia_accidente_temporal.ipynb`](modelo/modelo_ocurrencia_accidente_temporal.ipynb) conserva el desarrollo anterior y, desde el punto 3, reconstruye la ocurrencia por año para aplicar una evaluación temporal comparable con los modelos de estado y clase. `ANIO` se utiliza para los cortes, pero no entra como predictor. Esta versión también incluye el contraste con una partición aleatoria y la exportación del modelo seleccionado.
+
+[`modelo/modelo_ocurrencia_accidente_ajustado.ipynb`](modelo/modelo_ocurrencia_accidente_ajustado.ipynb) es la versión estructurada para el dataset anual. Entrena hasta 2020, selecciona modelos y umbrales con 2021–2023 y realiza la prueba final sobre los años completos 2024–2025. `ANIO` determina los cortes, pero nunca entra como predictor.
 
 ### 2. Estado del actor
 
@@ -148,8 +154,9 @@ Desde la raíz del proyecto:
 1. `data/limpieza_estructuracion_bd.ipynb`;
 2. `data/construccion_dataset.ipynb`;
 3. `modelo/modelo_ocurrencia_accidente.ipynb`;
-4. `modelo/modelo_estado_victima.ipynb`;
-5. `modelo/modelo_clase_accidente.ipynb`, solo para reproducir el experimento de clase.
+4. `modelo/modelo_ocurrencia_accidente_temporal.ipynb`, para evaluar la generalización entre años;
+5. `modelo/modelo_estado_victima.ipynb`;
+6. `modelo/modelo_clase_accidente.ipynb`, solo para reproducir el experimento de clase.
 
 Los notebooks de la carpeta `modelo/` usan rutas relativas hacia `../data/data_procesada/modelado/`, por lo que deben ejecutarse manteniendo esa estructura de directorios.
 
