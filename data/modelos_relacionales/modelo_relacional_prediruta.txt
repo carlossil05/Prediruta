@@ -9,6 +9,7 @@ Table ACCIDENTE {
   LATITUD decimal(9,6) [not null]
   LONGITUD decimal(9,6) [not null]
   CLASE_ACCIDENTE varchar
+
   CLIMA_ID integer
 
   OBJETIVO_GRAVE boolean [not null]
@@ -18,15 +19,9 @@ Table ACCIDENTE {
 
 Table VIA {
   ACCIDENTE_ID integer [pk]
-  GEOMETRIA_PLANTA varchar
-  GEOMETRIA_TERRENO varchar
-  GEOMETRIA_SECCION varchar
-  SENTIDO_VIA varchar
   N_CALZADAS integer
   N_CARRILES integer
   SUPERFICIE_RODADURA varchar
-  ESTADO_VIA varchar
-  CONDICION_VIA varchar
   ILUMINACION_ARTIFICIAL varchar
   SEMAFORO varchar
 
@@ -36,16 +31,13 @@ Table VIA {
 Table CLIMA {
   CLIMA_ID integer [pk]
   FECHA_HORA_CLIMA timestamp [not null]
-
   TEMPERATURA_2M decimal
   HUMEDAD_RELATIVA_2M decimal
-  SENSACION_TERMICA decimal
   PRECIPITACION decimal
   LLUVIA decimal
   NUBOSIDAD decimal
   PRESION_SUPERFICIE decimal
   VELOCIDAD_VIENTO_10M decimal
-  DIRECCION_VIENTO_10M decimal
 
   Note: 'Una observación meteorológica única relacionada con ACCIDENTE mediante CLIMA_ID.'
 }

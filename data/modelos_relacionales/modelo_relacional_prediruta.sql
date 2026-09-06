@@ -10,15 +10,9 @@ CREATE TABLE "ACCIDENTE" (
 
 CREATE TABLE "VIA" (
   "ACCIDENTE_ID" integer PRIMARY KEY,
-  "GEOMETRIA_PLANTA" varchar,
-  "GEOMETRIA_TERRENO" varchar,
-  "GEOMETRIA_SECCION" varchar,
-  "SENTIDO_VIA" varchar,
   "N_CALZADAS" integer,
   "N_CARRILES" integer,
   "SUPERFICIE_RODADURA" varchar,
-  "ESTADO_VIA" varchar,
-  "CONDICION_VIA" varchar,
   "ILUMINACION_ARTIFICIAL" varchar,
   "SEMAFORO" varchar
 );
@@ -28,13 +22,11 @@ CREATE TABLE "CLIMA" (
   "FECHA_HORA_CLIMA" timestamp NOT NULL,
   "TEMPERATURA_2M" decimal,
   "HUMEDAD_RELATIVA_2M" decimal,
-  "SENSACION_TERMICA" decimal,
   "PRECIPITACION" decimal,
   "LLUVIA" decimal,
   "NUBOSIDAD" decimal,
   "PRESION_SUPERFICIE" decimal,
-  "VELOCIDAD_VIENTO_10M" decimal,
-  "DIRECCION_VIENTO_10M" decimal
+  "VELOCIDAD_VIENTO_10M" decimal
 );
 
 CREATE TABLE "VEHICULO" (
