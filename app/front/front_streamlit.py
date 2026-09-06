@@ -4,6 +4,7 @@ import pandas as pd
 import folium
 import streamlit as st
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from streamlit_folium import st_folium
 
 # --- CONFIGURACIÓN DE URL Y PÁGINA ---
@@ -15,6 +16,11 @@ st.markdown("""
 PrediRuta es un sistema predictivo que permite estimar el nivel de riesgo vial 
 asociado a una ruta dentro de Bogotá.
 """)
+
+# --- ZONA HORARIA DE BOGOTÁ ---
+tz_bogota = ZoneInfo("America/Bogota")
+# Capturamos la hora actual sin segundos para validaciones exactas
+ahora_bogota = datetime.now(tz_bogota).replace(second=0, microsecond=0)
 
 # --- ESTADO DE SESIÓN ---
 if "mapa_calculado" not in st.session_state:
@@ -28,15 +34,35 @@ if "tramos_info" not in st.session_state:
 st.sidebar.header("Parámetros de la Ruta")
 origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colombia, Bogotá")
 destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
-hora_salida = st.sidebar.time_input("Hora de salida", datetime.now().time())
+
+# Inputs de Fecha y Hora
+fecha_salida = st.sidebar.date_input(
+    "Fecha de salida", 
+    value=ahora_bogota.date(), 
+    min_value=ahora_bogota.date()
+)
+hora_salida = st.sidebar.time_input(
+    "Hora de salida", 
+    value=ahora_bogota.time()
+)
+
+# --- VALIDACIÓN DE TIEMPO EN EL FUTURO ---
+# Combinamos la fecha y hora elegidas y le asignamos la zona horaria de Bogotá
+dt_salida = datetime.combine(fecha_salida, hora_salida).replace(tzinfo=tz_bogota)
+es_futuro = dt_salida >= ahora_bogota
+
+if not es_futuro:
+    st.sidebar.error("⚠️ La fecha y hora de salida deben ser en el futuro.")
 
 # --- BOTÓN DE CÁLCULO ---
-if st.sidebar.button("Calcular Ruta y Riesgo"):
+# Deshabilitamos visualmente la acción si el tiempo es inválido
+if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
     with st.spinner('Consultando API y procesando riesgo...'):
         try:
             payload = {
                 "origen": origen,
                 "destino": destino,
+                "fecha_salida": fecha_salida.strftime("%Y-%m-%d"),
                 "hora_salida": hora_salida.strftime("%H:%M")
             }
 
@@ -73,7 +99,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
                         "Hora Paso": t["hora_paso"],
                         "Origen (Lat, Lng)": t["origen_coord"],
                         "Destino (Lat, Lng)": t["destino_coord"],
-                        "Temperatura (°C)": f"{t['clima']['temperatura']:.1f}",  # <-- CAMBIO AQUÍ
+                        "Temperatura (°C)": f"{t['clima']['temperatura']:.1f}",
                         "Lluvia (mm)": f"{t['clima']['lluvia']:.1f}",
                         "Viento (km/h)": f"{t['clima']['viento']:.1f}",
                         "Riesgo": f"{t['probabilidad']:.2%}",
