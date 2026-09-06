@@ -1,33 +1,22 @@
-# crea un archivo de python llamado 'app_mapa.py' y guarda todo el texto de abajo dentro de él".
-
-#Librerias requeridas
-import streamlit as st
-import googlemaps
-import polyline
-import folium
-from streamlit_folium import st_folium
-import random
-from datetime import datetime
 import os
-import math
-import pandas as pd
-from datetime import datetime, timedelta
 import requests
+import pandas as pd
+import folium
+import streamlit as st
+from datetime import datetime
+from streamlit_folium import st_folium
 
+# --- CONFIGURACIÓN DE URL Y PÁGINA ---
+API_URL = os.getenv("API_URL", "https://prediruta-api-carlos.up.railway.app/predict")
 
-# Se obtiene la variable 'API_Google' del env
-api_key = os.getenv("GOOGLE_APIKEY")
-
-
-# Titulos y descripción de la página
 st.set_page_config(page_title="PrediRuta", layout="wide")
 st.title("PrediRuta")
 st.markdown(""" 
 PrediRuta es un sistema predictivo que permite estimar el nivel de riesgo vial 
-asociado a una ruta dentro de Bogotá
+asociado a una ruta dentro de Bogotá.
 """)
 
-# --- Memoria del mapa---
+# --- ESTADO DE SESIÓN ---
 if "mapa_calculado" not in st.session_state:
     st.session_state.mapa_calculado = None
 if "detalles_ruta" not in st.session_state:
@@ -35,251 +24,89 @@ if "detalles_ruta" not in st.session_state:
 if "tramos_info" not in st.session_state:
     st.session_state.tramos_info = []
 
-# Barra lateral para ingreso de información del usuario
+# --- PARÁMETROS DE ENTRADA ---
 st.sidebar.header("Parámetros de la Ruta")
 origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colombia, Bogotá")
 destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
 hora_salida = st.sidebar.time_input("Hora de salida", datetime.now().time())
 
-# Configuración de distancia de tramo
 distancia_tramo_km = st.sidebar.number_input(
     "Distancia de cada tramo (km)", 
     min_value=0.1, 
     max_value=10.0, 
     value=1.0, 
     step=0.5,
-    help="Modifica este valor para cambiar la longitud de segmentación de la ruta."
+    help="Longitud de segmentación de la ruta."
 )
-
-# --- Funciones Auxiliares Geográficas ---
-def haversine_distance(coord1, coord2):
-    """Calcula la distancia en kilómetros entre dos coordenadas (lat, lng)."""
-    R = 6371.0  # Radio de la Tierra en km
-    lat1, lon1 = math.radians(coord1[0]), math.radians(coord1[1])
-    lat2, lon2 = math.radians(coord2[0]), math.radians(coord2[1])
-
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-
-    a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-def interpolar_punto(p1, p2, fraccion):
-    """Interpola un punto entre p1 y p2 según una fracción (0 a 1)."""
-    lat = p1[0] + (p2[0] - p1[0]) * fraccion
-    lng = p1[1] + (p2[1] - p1[1]) * fraccion
-    return (lat, lng)
-
-def segmentar_ruta(puntos_full, tamano_tramo_km):
-    """
-    Divide una lista de puntos (lat, lng) en tramos de longitud aproximada tamano_tramo_km.
-    Retorna una lista de tramos, donde cada tramo es una lista de puntos.
-    """
-    if not puntos_full or len(puntos_full) < 2:
-        return [puntos_full] if puntos_full else []
-
-    tramos = []
-    tramo_actual = [puntos_full[0]]
-    dist_acumulada = 0.0
-
-    for i in range(len(puntos_full) - 1):
-        p_inicio = puntos_full[i]
-        p_fin = puntos_full[i+1]
-        dist_segmento = haversine_distance(p_inicio, p_fin)
-
-        if dist_segmento == 0:
-            continue
-
-        p_cursor = p_inicio
-        dist_restante = dist_segmento
-
-        while dist_acumulada + dist_restante >= tamano_tramo_km:
-            necesario = tamano_tramo_km - dist_acumulada
-            fraccion = necesario / dist_restante
-            p_corte = interpolar_punto(p_cursor, p_fin, fraccion)
-
-            tramo_actual.append(p_corte)
-            tramos.append(tramo_actual)
-
-            # Iniciar nuevo tramo
-            tramo_actual = [p_corte]
-            dist_acumulada = 0.0
-            p_cursor = p_corte
-            dist_restante = haversine_distance(p_cursor, p_fin)
-
-        if dist_restante > 0:
-            tramo_actual.append(p_fin)
-            dist_acumulada += dist_restante
-
-    if len(tramo_actual) > 1:
-        tramos.append(tramo_actual)
-
-    return tramos
-
-
-# Función para simular el índice de riesgo mientras se define modelo
-def obtener_color_riesgo():
-    # Índice de riesgo aleatorio entre 0 y 1
-    riesgo = random.random()
-
-    if riesgo < 0.3:
-        return "green", riesgo, "Bajo"
-    elif riesgo < 0.6:
-        return "orange", riesgo, "Medio"
-    else:
-        return "red", riesgo, "Alto"
-
-import requests
-
-def obtener_clima_tramo(lat, lng, hora_paso):
-    """
-    Obtiene sensación térmica, lluvia y velocidad del viento a 10m
-    para las coordenadas y hora indicadas desde Open-Meteo.
-    """
-    try:
-        url = "https://api.open-meteo.com/v1/forecast"
-        params = {
-            "latitude": lat,
-            "longitude": lng,
-            "hourly": "apparent_temperature,rain,wind_speed_10m",
-            "forecast_days": 1,
-            "timezone": "America/Bogota"
-        }
-        res = requests.get(url, params=params, timeout=5)
-        data = res.json()
-
-        if "hourly" in data:
-            # Encuentra el índice de hora más cercano a la hora de paso
-            hora_str = hora_paso.strftime("%Y-%m-%dT%H:00")
-            
-            if hora_str in data["hourly"]["time"]:
-                idx = data["hourly"]["time"].index(hora_str)
-            else:
-                idx = 0  # Fallback a la hora más cercana disponible
-
-            sensacion_termica = data["hourly"]["apparent_temperature"][idx] # °C
-            lluvia = data["hourly"]["rain"][idx]                           # mm
-            viento = data["hourly"]["wind_speed_10m"][idx]                 # km/h
-
-            return sensacion_termica, lluvia, viento
-            
-    except Exception:
-        pass
-
-    # Valores por defecto en caso de falla de conexión
-    return 18.0, 0.0, 10.0
-
 
 # --- BOTÓN DE CÁLCULO ---
 if st.sidebar.button("Calcular Ruta y Riesgo"):
+    with st.spinner('Consultando API y procesando riesgo...'):
+        try:
+            payload = {
+                "origen": origen,
+                "destino": destino,
+                "hora_salida": hora_salida.strftime("%H:%M"),
+                "distancia_tramo_km": distancia_tramo_km
+            }
 
-    #Si no hay API key
-    if not api_key:
-        st.sidebar.error("⚠️ Error de lectura de la API Key de Google maps")
-    else:
+            response = requests.post(API_URL, json=payload, timeout=30)
 
-        #Spinner mientras calcula la ruta
-        with st.spinner('Calculando ruta...'):
+            if response.status_code == 200:
+                data = response.json()
+                resumen = data["resumen"]
+                tramos = data["tramos"]
 
-            try:
+                # Crear Mapa en Folium con la respuesta del backend
+                start_loc = resumen["start_location"]
+                end_loc = resumen["end_location"]
 
-                #usa la libreria de googlemaps y la clave  de la API
-                gmaps = googlemaps.Client(key=api_key)
+                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], zoom_start=13)
+                folium.Marker([start_loc["lat"], start_loc["lng"]], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
+                folium.Marker([end_loc["lat"], end_loc["lng"]], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
 
-                #
-                departure_time = datetime.combine(datetime.now().date(), hora_salida)
+                tramos_tabla = []
 
-                directions_result = gmaps.directions(
-                    origen, destino, mode="driving", departure_time=departure_time
-                )
+                for t in tramos:
+                    # Dibujar tramo en el mapa
+                    folium.PolyLine(
+                        locations=t["puntos_polyline"],
+                        color=t["color"],
+                        weight=6,
+                        opacity=0.8,
+                        tooltip=f"Tramo {t['tramo']} ({distancia_tramo_km} km) - Hora: {t['hora_paso']} | Riesgo {t['nivel_riesgo']}: {t['probabilidad']:.2%}"
+                    ).add_to(m)
 
-                if directions_result:
-                    route = directions_result[0]
-                    legs = route['legs'][0]
+                    # Estructurar fila para la tabla
+                    tramos_tabla.append({
+                        "Tramo": f"Tramo {t['tramo']}",
+                        "Hora Paso": t["hora_paso"],
+                        "Origen (Lat, Lng)": t["origen_coord"],
+                        "Destino (Lat, Lng)": t["destino_coord"],
+                        "Sensación Térmica (°C)": f"{t['clima']['sensacion_termica']:.1f}",
+                        "Lluvia (mm)": f"{t['clima']['lluvia']:.1f}",
+                        "Viento (km/h)": f"{t['clima']['viento']:.1f}",
+                        "Riesgo": f"{t['probabilidad']:.2%}",
+                        "Nivel": t["nivel_riesgo"]
+                    })
 
-                    # Polilínea completa de la ruta
-                    polyline_str = route['overview_polyline']['points']
-                    puntos_totales = polyline.decode(polyline_str)
+                # Guardar en memoria de Streamlit
+                st.session_state.mapa_calculado = m
+                st.session_state.detalles_ruta = f"**Distancia total:** {resumen['distancia_total']} | **Duración estimada:** {resumen['duracion_estimada']} | **Tramos:** {resumen['total_tramos']} | **Riesgo Máximo:** {resumen['riesgo_maximo_ruta']:.2%}"
+                st.session_state.tramos_info = tramos_tabla
 
-                    # Segmentar ruta en tramos de N km
-                    tramos_segmentados = segmentar_ruta(puntos_totales, distancia_tramo_km)
+            else:
+                error_detail = response.json().get("detail", "Error desconocido en el servidor.")
+                st.error(f"Error de la API ({response.status_code}): {error_detail}")
 
-                    start_lat = legs['start_location']['lat']
-                    start_lng = legs['start_location']['lng']
+        except Exception as e:
+            st.error(f"Error de conexión con el backend: {e}")
 
-                    # Crear mapa Folium
-                    m = folium.Map(location=[start_lat, start_lng], zoom_start=13)
-                    folium.Marker([start_lat, start_lng], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
-                    folium.Marker([legs['end_location']['lat'], legs['end_location']['lng']], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
-
-                    tramos_info = []
-
-                    # Duración total calculada por Google en segundos
-                    duracion_total_segundos = legs['duration']['value']
-
-                    # Estimación de tiempo por tramo (en segundos)
-                    num_tramos = len(tramos_segmentados)
-                    segundos_por_tramo = duracion_total_segundos / num_tramos if num_tramos > 0 else 0
-
-                    hora_acumulada = departure_time
-                    tramos_info = []
-
-                    # Trazar cada tramo individualizado
-                    for idx, tramo_pts in enumerate(tramos_segmentados, start=1):
-                        color, riesgo, nivel = obtener_color_riesgo()
-
-                        # Hora de inicio y fin del tramo
-                        hora_inicio_tramo = hora_acumulada
-                        hora_fin_tramo = hora_acumulada + timedelta(seconds=segundos_por_tramo)
-                        hora_acumulada = hora_fin_tramo  # Siguiente tramo inicia donde termina este
-                        
-                        # Dibujar en mapa
-                        folium.PolyLine(
-                            locations=tramo_pts, 
-                            color=color, 
-                            weight=6, 
-                            opacity=0.8, 
-                            tooltip=f"Tramo {idx} ({distancia_tramo_km} km) - Riesgo {nivel}: {riesgo:.2f}"
-                        ).add_to(m)
-
-                        # Guardar información del tramo para la tabla
-                        lat_inicio, lng_inicio = tramo_pts[0]
-                        lat_fin, lng_fin = tramo_pts[-1]
-                        
-                        # Consulta de clima para las coordenadas del tramo
-                        sens_termica, lluvia, viento = obtener_clima_tramo(lat_inicio, lng_inicio, hora_inicio_tramo)
-                        
-                        tramos_info.append({
-                            "Tramo": f"Tramo {idx}",
-                            "Hora Paso": f"{hora_inicio_tramo.strftime('%H:%M')} - {hora_fin_tramo.strftime('%H:%M')}",
-                            "Origen (Lat, Lng)": f"{lat_inicio:.4f}, {lng_inicio:.4f}",
-                            "Sensación Térmica (°C)": f"{sens_termica:.1f}",
-                            "Lluvia (mm)": f"{lluvia:.1f}",
-                            "Viento (km/h)": f"{viento:.1f}",
-                            "Riesgo": f"{riesgo:.2%}",
-                            "Nivel": nivel
-                        })
-
-                    # Guardar en estado
-                    st.session_state.mapa_calculado = m
-                    st.session_state.detalles_ruta = f"**Distancia total:** {legs['distance']['text']} | **Duración estimada:** {legs['duration']['text']} | **Tramos generados:** {len(tramos_segmentados)}"
-                    st.session_state.tramos_info = tramos_info
-
-                else:
-                    st.warning("No se encontró una ruta válida.")
-
-            except Exception as e:
-                st.error(f"Error al conectar con Google Maps: {e}")
-
-# --- MOSTRAR RESULTADOS ---
-
+# --- RENDERING DE LA INTERFAZ ---
 if st.session_state.mapa_calculado is not None:
-    # Mostrar mapa
     st_folium(st.session_state.mapa_calculado, width=900, height=500, returned_objects=[])
     st.success(st.session_state.detalles_ruta)
 
-    # Mostrar la lista/tabla de tramos generados
     st.subheader("📋 Detalle de Tramos de la Ruta")
     df_tramos = pd.DataFrame(st.session_state.tramos_info)
     st.dataframe(df_tramos, use_container_width=True)
