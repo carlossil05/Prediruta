@@ -144,7 +144,7 @@ def procesar_y_predecir_ruta(data: SolicitudRuta):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    @app.get("/test-mlp", tags=["Pruebas"])
+@app.get("/test-mlp", tags=["Pruebas"])
 def test_modelo_mlp():
     """
     Endpoint de prueba precargado con 3 tramos de ejemplo para verificar 
