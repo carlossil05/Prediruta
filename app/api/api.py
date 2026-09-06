@@ -4,6 +4,7 @@ import polyline
 import pandas as pd
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
+from zoneinfo import ZoneInfo
 
 # Importaciones locales
 from schemas import SolicitudRuta
@@ -40,10 +41,13 @@ def health_check():
 @app.post("/predict")
 def procesar_y_predecir_ruta(data: SolicitudRuta):
     try:
-        # 1. Parsing de fecha y hora
+        # 1. Parsing de fecha y hora con Zona Horaria
+        tz_bogota = ZoneInfo("America/Bogota")
         fecha_dt = datetime.strptime(data.fecha_salida, "%Y-%m-%d").date()
         hora_dt = datetime.strptime(data.hora_salida, "%H:%M").time()
-        departure_time = datetime.combine(fecha_dt, hora_dt)
+        
+        # Combinar y forzar la zona horaria de Bogotá
+        departure_time = datetime.combine(fecha_dt, hora_dt).replace(tzinfo=tz_bogota)
 
         # 2. Consulta a Google Maps
         directions = obtener_direcciones_gmaps(data.origen, data.destino, departure_time)
