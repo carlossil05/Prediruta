@@ -130,11 +130,11 @@ def obtener_clima_tramo(lat, lng, hora_paso):
 class SolicitudRuta(BaseModel):
     origen: str = Field(..., example="Universidad Nacional de Colombia, Bogotá")
     destino: str = Field(..., example="Parque de la 93, Bogotá")
-    hora_salida: str = Field(..., example="14:30") 
-    distancia_tramo_km: float = Field(1.0, ge=0.1, le=10.0)
+    fecha_salida: str = Field(..., example="2026-10-25")  # NUEVO CAMPO
+    hora_salida: str = Field(..., example="14:30")
 
-# El umbral del modelo MLP según el metadata es ~0.52. Ajustamos los umbrales de negocio
-UMBRAL_BAJO, UMBRAL_MEDIO = 0.35, 0.65
+
+UMBRAL_BAJO, UMBRAL_MEDIO = 0.3, 0.6
 
 def clasificar_riesgo(prob: float):
     if prob < UMBRAL_BAJO:
@@ -155,9 +155,9 @@ def procesar_y_predecir_ruta(data: SolicitudRuta):
         raise HTTPException(status_code=500, detail="GOOGLE_APIKEY no configurada.")
 
     try:
-        hoy = datetime.now().date()
+        fecha_dt = datetime.strptime(data.fecha_salida, "%Y-%m-%d").date()
         hora_dt = datetime.strptime(data.hora_salida, "%H:%M").time()
-        departure_time = datetime.combine(hoy, hora_dt)
+        departure_time = datetime.combine(fecha_dt, hora_dt)
 
         gmaps = googlemaps.Client(key=GOOGLE_APIKEY)
         directions = gmaps.directions(data.origen, data.destino, mode="driving", departure_time=departure_time)
