@@ -5,7 +5,7 @@ import streamlit as st
 import googlemaps
 import polyline
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import st_folium
 import random
 from datetime import datetime
 import os
@@ -118,16 +118,15 @@ def segmentar_ruta(puntos_full, tamano_tramo_km):
 
 # Función para simular el índice de riesgo mientras se define modelo
 def obtener_color_riesgo():
-
-    # Indice de riesgo aleatorio entre 0 y 1
+    # Índice de riesgo aleatorio entre 0 y 1
     riesgo = random.random()
 
     if riesgo < 0.3:
-        return "green", riesgo  # Riesgo Bajo
+        return "green", riesgo, "Bajo"
     elif riesgo < 0.6:
-        return "orange", riesgo # Riesgo Medio
+        return "orange", riesgo, "Medio"
     else:
-        return "red", riesgo    # Riesgo Alto
+        return "red", riesgo, "Alto"
 
 
 # --- BOTÓN DE CÁLCULO ---
@@ -214,7 +213,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
 
 if st.session_state.mapa_calculado is not None:
     # Mostrar mapa
-    folium_static(st.session_state.mapa_calculado, width=900, height=500)
+    st_folium(st.session_state.mapa_calculado, width=900, height=500, returned_objects=[])
     st.success(st.session_state.detalles_ruta)
 
     # Mostrar la lista/tabla de tramos generados
@@ -224,4 +223,4 @@ if st.session_state.mapa_calculado is not None:
 
 else:
     mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11)
-    folium_static(mapa_por_defecto, width=900, height=500)
+    st_folium(mapa_por_defecto, width=900, height=500, returned_objects=[])
