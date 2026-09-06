@@ -9,29 +9,33 @@ import numpy as np
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
-from typing import List, Optional
 
 # Inicialización de FastAPI
 app = FastAPI(
-    title="API PrediRuta - Riesgo Vial Bogotá",
-    version="2.0.0",
-    description="API centralizada para cálculo de rutas, segmentación, clima e inferencia de riesgo vial."
+    title="API PrediRuta - Riesgo Vial Bogotá (MLP)",
+    version="3.0.0",
+    description="API centralizada con modelo MLP (11 variables) para inferencia de riesgo vial."
 )
 
 # Carga de Variables y Artefactos
 GOOGLE_APIKEY = os.getenv("GOOGLE_APIKEY")
-MODEL_PATH = os.path.join("modelo", "modelo_xgboost_bogota.joblib")
+# Actualizado al nuevo nombre del modelo
+MODEL_PATH = os.path.join("modelo", "modelo_ocurrencia_temporal.joblib")
 CENTROIDES_PATH = os.path.join("modelo", "centroides_zonas.csv")
 
 if not os.path.exists(MODEL_PATH) or not os.path.exists(CENTROIDES_PATH):
-    raise FileNotFoundError("Los archivos 'modelo_xgboost_bogota.joblib' y 'centroides_zonas.csv' no están en el directorio 'modelo/'.")
+    raise FileNotFoundError(f"Faltan archivos en 'modelo/'. Verifica que existan {MODEL_PATH} y {CENTROIDES_PATH}")
 
+# El Pipeline de Scikit-Learn (ya incluye escalado y one-hot encoding internamente)
 model = joblib.load(MODEL_PATH)
 centroides_df = pd.read_csv(CENTROIDES_PATH)
 
 LATS_CENTROIDES = centroides_df['LATITUD_CENTROIDE'].values
 LNGS_CENTROIDES = centroides_df['LONGITUD_CENTROIDE'].values
 ZONAS_IDS = centroides_df['ZONA_CIUDAD'].values
+
+#Se calcula como el diametro de los clusters: raiz(AreaBogota/Nclusters)*2=raiz(384/150)*2=3.2
+DISTANCIA_TRAMO_KM = 3.2
 
 # --- FUNCIONES GEOGRÁFICAS Y METEOROLÓGICAS ---
 
@@ -82,53 +86,55 @@ def segmentar_ruta(puntos_full, tamano_tramo_km):
 
     return tramos
 
-def obtener_clima_tramo(lat: float, lng: float, hora_paso):
+def obtener_clima_tramo(lat, lng, hora_paso):
     """
-    Consulta el clima para las coordenadas dadas utilizando la Google Weather API.
+    Obtiene las 6 variables climáticas base y calcula las 2 trigonométricas
+    requeridas por el nuevo modelo MLP.
     """
-    if not GOOGLE_APIKEY:
-        return 18.0, 0.0, 10.0  # Fallback si no hay API key
-
     try:
-        # Endpoint oficial de pronóstico por horas de Google Weather API
-        url = "https://weather.googleapis.com/v1/forecast/hourly:lookup"
+        url = "https://api.open-meteo.com/v1/forecast"
         params = {
-            "key": GOOGLE_APIKEY,
-            "location.latitude": lat,
-            "location.longitude": lng,
-            "hours": 24
+            "latitude": lat, "longitude": lng,
+            # Se solicitan todas las variables necesarias para el modelo
+            "hourly": "temperature_2m,precipitation,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m",
+            "forecast_days": 1, "timezone": "America/Bogota"
         }
         res = requests.get(url, params=params, timeout=5)
-        
-        if res.status_code == 200:
-            data = res.json()
-            
-            # Extraer las variables requeridas para tu modelo XGBoost
-            # (Sensación térmica, Lluvia/Precipitación, Velocidad del viento)
-            forecast = data.get("hourlyForecasts", [])[0]
-            
-            sensacion_termica = forecast.get("feelsLikeTemperature", {}).get("value", 18.0)
-            lluvia = forecast.get("precipitation", {}).get("qpfQuantity", {}).get("value", 0.0)
-            viento = forecast.get("wind", {}).get("speed", {}).get("value", 10.0)
+        data = res.json()
 
-            return sensacion_termica, lluvia, viento
+        if "hourly" in data:
+            hora_str = hora_paso.strftime("%Y-%m-%dT%H:00")
+            idx = data["hourly"]["time"].index(hora_str) if hora_str in data["hourly"]["time"] else 0
+            
+            temp = data["hourly"]["temperature_2m"][idx]
+            precip = data["hourly"]["precipitation"][idx]
+            nubosidad = data["hourly"]["cloud_cover"][idx]
+            presion = data["hourly"]["surface_pressure"][idx]
+            v_viento = data["hourly"]["wind_speed_10m"][idx]
+            dir_viento_grados = data["hourly"]["wind_direction_10m"][idx]
+
+            # Transformaciones trigonométricas para la dirección del viento
+            dir_sin = math.sin(math.radians(dir_viento_grados))
+            dir_cos = math.cos(math.radians(dir_viento_grados))
+
+            return temp, precip, nubosidad, presion, v_viento, dir_sin, dir_cos
 
     except Exception:
         pass
-
-    # Valores por defecto en caso de fallo en la llamada HTTP
-    return 18.0, 0.0, 10.0
+    
+    # Fallback con valores promedio si la API falla
+    return 15.0, 0.0, 50.0, 750.0, 10.0, 0.0, 1.0
 
 # --- ESQUEMAS DE ENTRADA Y SALIDA ---
 
 class SolicitudRuta(BaseModel):
     origen: str = Field(..., example="Universidad Nacional de Colombia, Bogotá")
     destino: str = Field(..., example="Parque de la 93, Bogotá")
-    hora_salida: str = Field(..., example="14:30")  # Formato HH:MM
-    distancia_tramo_km: float = Field(1.0, ge=0.1, le=10.0, example=1.0)
+    hora_salida: str = Field(..., example="14:30") 
+    distancia_tramo_km: float = Field(1.0, ge=0.1, le=10.0)
 
-# Clasificación de Riesgo
-UMBRAL_BAJO, UMBRAL_MEDIO = 0.3, 0.6
+# El umbral del modelo MLP según el metadata es ~0.52. Ajustamos los umbrales de negocio
+UMBRAL_BAJO, UMBRAL_MEDIO = 0.35, 0.65
 
 def clasificar_riesgo(prob: float):
     if prob < UMBRAL_BAJO:
@@ -141,35 +147,31 @@ def clasificar_riesgo(prob: float):
 
 @app.get("/")
 def health_check():
-    return {"status": "ok", "message": "API PrediRuta operativa (v2.0.0)"}
+    return {"status": "ok", "message": "API PrediRuta operativa (MLP Pipeline)"}
 
 @app.post("/predict")
 def procesar_y_predecir_ruta(data: SolicitudRuta):
     if not GOOGLE_APIKEY:
-        raise HTTPException(status_code=500, detail="GOOGLE_APIKEY no configurada en el servidor backend.")
+        raise HTTPException(status_code=500, detail="GOOGLE_APIKEY no configurada.")
 
     try:
-        # 1. Parsing de fecha y hora
         hoy = datetime.now().date()
         hora_dt = datetime.strptime(data.hora_salida, "%H:%M").time()
         departure_time = datetime.combine(hoy, hora_dt)
 
-        # 2. Consulta a Google Maps
         gmaps = googlemaps.Client(key=GOOGLE_APIKEY)
         directions = gmaps.directions(data.origen, data.destino, mode="driving", departure_time=departure_time)
 
         if not directions:
-            raise HTTPException(status_code=404, detail="No se encontró una ruta válida para las direcciones especificadas.")
+            raise HTTPException(status_code=404, detail="No se encontró una ruta válida.")
 
         leg = directions[0]['legs'][0]
         points_decoded = polyline.decode(directions[0]['overview_polyline']['points'])
 
-        # 3. Segmentación de ruta
-        tramos_segmentados = segmentar_ruta(points_decoded, data.distancia_tramo_km)
+        tramos_segmentados = segmentar_ruta(points_decoded, DISTANCIA_TRAMO_KM)
         duracion_seg = leg['duration']['value']
         seg_por_tramo = duracion_seg / len(tramos_segmentados) if tramos_segmentados else 0
 
-        # 4. Construcción de Dataset para Inferencia
         registros = []
         hora_acumulada = departure_time
 
@@ -181,34 +183,43 @@ def procesar_y_predecir_ruta(data: SolicitudRuta):
             lat_in, lng_in = tramo_pts[0]
             lat_out, lng_out = tramo_pts[-1]
 
-            sens, lluvia, viento = obtener_clima_tramo(lat_in, lng_in, h_inicio)
+            # Consulta expandida para el MLP
+            temp, precip, nubosidad, presion, v_viento, dir_sin, dir_cos = obtener_clima_tramo(lat_in, lng_in, h_inicio)
             zona = obtener_zona_mas_cercana(lat_in, lng_in)
 
             registros.append({
                 "tramo": idx + 1,
                 "puntos_polyline": tramo_pts,
-                "hora_inicio": h_inicio.strftime("%H:%M"),
-                "hora_fin": h_fin.strftime("%H:%M"),
-                "lat_inicio": lat_in,
-                "lng_inicio": lng_in,
-                "lat_fin": lat_out,
-                "lng_fin": lng_out,
+                "hora_paso": f"{h_inicio.strftime('%H:%M')} - {h_fin.strftime('%H:%M')}",
+                "origen_coord": f"{lat_in:.4f}, {lng_in:.4f}",
+                "destino_coord": f"{lat_out:.4f}, {lng_out:.4f}",
+                # Columnas exactas requeridas por el modelo
                 "ZONA_CIUDAD": zona,
                 "MES": h_inicio.month,
                 "DIA_SEMANA": h_inicio.weekday(),
                 "HORA": h_inicio.hour,
-                "SENSACION_TERMICA": sens,
-                "LLUVIA": lluvia,
-                "VELOCIDAD_VIENTO_10M": viento
+                "TEMPERATURA_2M": temp,
+                "PRECIPITACION": precip,
+                "NUBOSIDAD": nubosidad,
+                "PRESION_SUPERFICIE": presion,
+                "VELOCIDAD_VIENTO_10M": v_viento,
+                "DIRECCION_VIENTO_10M_SIN": dir_sin,
+                "DIRECCION_VIENTO_10M_COS": dir_cos
             })
 
         df_input = pd.DataFrame(registros)
 
-        # 5. Predicción Vectorizada con XGBoost
-        columnas_modelo = ['ZONA_CIUDAD', 'MES', 'DIA_SEMANA', 'HORA', 'SENSACION_TERMICA', 'LLUVIA', 'VELOCIDAD_VIENTO_10M']
+        # Orden estricto de las 11 columnas
+        columnas_modelo = [
+            'ZONA_CIUDAD', 'MES', 'DIA_SEMANA', 'HORA', 
+            'TEMPERATURA_2M', 'PRECIPITACION', 'NUBOSIDAD', 
+            'PRESION_SUPERFICIE', 'VELOCIDAD_VIENTO_10M', 
+            'DIRECCION_VIENTO_10M_SIN', 'DIRECCION_VIENTO_10M_COS'
+        ]
+        
+        # El pipeline de sklearn se encarga internamente de escalar e imputar
         probabilidades = model.predict_proba(df_input[columnas_modelo])[:, 1]
 
-        # 6. Formatear Respuesta Final
         detalle_tramos = []
         for idx, row in df_input.iterrows():
             prob = float(probabilidades[idx])
@@ -217,12 +228,12 @@ def procesar_y_predecir_ruta(data: SolicitudRuta):
             detalle_tramos.append({
                 "tramo": int(row['tramo']),
                 "puntos_polyline": row['puntos_polyline'],
-                "hora_paso": f"{row['hora_inicio']} - {row['hora_fin']}",
-                "origen_coord": f"{row['lat_inicio']:.4f}, {row['lng_inicio']:.4f}",
-                "destino_coord": f"{row['lat_fin']:.4f}, {row['lng_fin']:.4f}",
+                "hora_paso": row['hora_paso'],
+                "origen_coord": row['origen_coord'],
+                "destino_coord": row['destino_coord'],
                 "clima": {
-                    "sensacion_termica": row['SENSACION_TERMICA'],
-                    "lluvia": row['LLUVIA'],
+                    "temperatura": row['TEMPERATURA_2M'],
+                    "lluvia": row['PRECIPITACION'],
                     "viento": row['VELOCIDAD_VIENTO_10M']
                 },
                 "probabilidad": round(prob, 4),

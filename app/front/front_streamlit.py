@@ -30,15 +30,6 @@ origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colom
 destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
 hora_salida = st.sidebar.time_input("Hora de salida", datetime.now().time())
 
-distancia_tramo_km = st.sidebar.number_input(
-    "Distancia de cada tramo (km)", 
-    min_value=0.1, 
-    max_value=10.0, 
-    value=1.0, 
-    step=0.5,
-    help="Longitud de segmentación de la ruta."
-)
-
 # --- BOTÓN DE CÁLCULO ---
 if st.sidebar.button("Calcular Ruta y Riesgo"):
     with st.spinner('Consultando API y procesando riesgo...'):
@@ -83,7 +74,7 @@ if st.sidebar.button("Calcular Ruta y Riesgo"):
                         "Hora Paso": t["hora_paso"],
                         "Origen (Lat, Lng)": t["origen_coord"],
                         "Destino (Lat, Lng)": t["destino_coord"],
-                        "Sensación Térmica (°C)": f"{t['clima']['sensacion_termica']:.1f}",
+                        "Temperatura (°C)": f"{t['clima']['temperatura']:.1f}",  # <-- CAMBIO AQUÍ
                         "Lluvia (mm)": f"{t['clima']['lluvia']:.1f}",
                         "Viento (km/h)": f"{t['clima']['viento']:.1f}",
                         "Riesgo": f"{t['probabilidad']:.2%}",
