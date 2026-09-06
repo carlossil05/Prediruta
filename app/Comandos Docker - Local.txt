@@ -1,0 +1,13 @@
+#Construir imagen de Docker
+docker build -t prediruta-app .
+
+#Ejecutar streamlit y la API con el ar chivo .env local
+docker run -d -p 8501:8501 -p 8000:8000 --env-file .env --name prediruta_contenedor prediruta-app
+
+#Acceder a la app de streamlit
+http://localhost:8501
+
+#Acceder a la API
+
+#Detener Docker
+docker stop prediruta_contenedor; docker rm prediruta_contenedor
