@@ -1,3 +1,4 @@
 data/.env
 /data/data
 /data/data_procesada
+app/.vscode/settings.json

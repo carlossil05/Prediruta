@@ -1,112 +1,149 @@
-# crea un archivo de python llamado 'app_mapa.py' y guarda todo el texto de abajo dentro de él".
-
-#Librerias requeridas
-import streamlit as st
-import googlemaps
-import polyline
-import folium
-from streamlit_folium import folium_static
-import random
-from datetime import datetime
 import os
+import requests
+import pandas as pd
+import folium
+import streamlit as st
+from datetime import datetime
+from zoneinfo import ZoneInfo
+from streamlit_folium import st_folium
 
+# --- CONFIGURACIÓN DE URL Y PÁGINA ---
+API_URL = os.getenv("API_URL", "https://prediruta-api-pruebas.up.railway.app/predict")
 
-# Se obtiene la variable 'API_Google' del env
-api_key = os.getenv("GOOGLE_APIKEY")
-
-
-# Titulos y descripción de la página
 st.set_page_config(page_title="PrediRuta", layout="wide")
 st.title("PrediRuta")
 st.markdown(""" 
 PrediRuta es un sistema predictivo que permite estimar el nivel de riesgo vial 
-asociado a una ruta dentro de Bogotá
+asociado a una ruta dentro de Bogotá.
 """)
 
-# --- Memoria del mapa---
+# --- ZONA HORARIA DE BOGOTÁ ---
+tz_bogota = ZoneInfo("America/Bogota")
+# Capturamos la hora actual sin segundos para validaciones exactas
+ahora_bogota = datetime.now(tz_bogota).replace(second=0, microsecond=0)
+
+# --- ESTADO DE SESIÓN ---
 if "mapa_calculado" not in st.session_state:
     st.session_state.mapa_calculado = None
 if "detalles_ruta" not in st.session_state:
     st.session_state.detalles_ruta = ""
+if "tramos_info" not in st.session_state:
+    st.session_state.tramos_info = []
 
-# Barra lateral para ingreso de información del usuario
+# --- PARÁMETROS DE ENTRADA ---
 st.sidebar.header("Parámetros de la Ruta")
-origen = st.sidebar.text_input("Punto de Inicio", "Universidad Nacional de Colombia, Bogotá")
+origen = st.sidebar.text_input("Punto de Inicio", "Terminal del sur, Bogotá")
 destino = st.sidebar.text_input("Destino", "Parque de la 93, Bogotá")
-hora_salida = st.sidebar.time_input("Hora de salida", datetime.now().time())
 
-# Función para simular el índice de riesgo mientras se define modelo
-def obtener_color_riesgo():
+# Inputs de Fecha y Hora
+fecha_salida = st.sidebar.date_input(
+    "Fecha de salida", 
+    value=ahora_bogota.date(), 
+    min_value=ahora_bogota.date()
+)
+hora_salida = st.sidebar.time_input(
+    "Hora de salida", 
+    value=ahora_bogota.time()
+)
 
-    # Indice de riesgo aleatorio entre 0 y 1
-    riesgo = random.random()
+# --- VALIDACIÓN DE TIEMPO EN EL FUTURO ---
+# Combinamos la fecha y hora elegidas y le asignamos la zona horaria de Bogotá
+dt_salida = datetime.combine(fecha_salida, hora_salida).replace(tzinfo=tz_bogota)
+es_futuro = dt_salida >= ahora_bogota
 
-    if riesgo < 0.33:
-        return "green", riesgo  # Riesgo Bajo
-    elif riesgo < 0.66:
-        return "orange", riesgo # Riesgo Medio
-    else:
-        return "red", riesgo    # Riesgo Alto
-
+if not es_futuro:
+    st.sidebar.error("⚠️ La fecha y hora de salida deben ser en el futuro.")
 
 # --- BOTÓN DE CÁLCULO ---
-if st.sidebar.button("Calcular Ruta y Riesgo"):
+# Deshabilitamos visualmente la acción si el tiempo es inválido
+if st.sidebar.button("Calcular Ruta y Riesgo", disabled=not es_futuro):
+    with st.spinner('Consultando API y procesando riesgo...'):
+        try:
+            payload = {
+                "origen": origen,
+                "destino": destino,
+                "fecha_salida": fecha_salida.strftime("%Y-%m-%d"),
+                "hora_salida": hora_salida.strftime("%H:%M")
+            }
 
-    #Si no hay API key
-    if not api_key:
-        st.sidebar.error("⚠️ La API Key es obligatoria para calcular la ruta.")
-    else:
+            response = requests.post(API_URL, json=payload, timeout=30)
 
-        #Spinner mientras calcula la ruta
-        with st.spinner('Calculando ruta...'):
+            if response.status_code == 200:
+                data = response.json()
+                resumen = data["resumen"]
+                tramos = data["tramos"]
 
-            try:
+                # Crear Mapa en Folium con la respuesta del backend
+                start_loc = resumen["start_location"]
+                end_loc = resumen["end_location"]
 
-                #usa la libreria de googlemaps y la clave  de la API
-                gmaps = googlemaps.Client(key=api_key)
+                m = folium.Map(location=[start_loc["lat"], start_loc["lng"]], 
+                               tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                               attr='Esri')
+                folium.Marker([start_loc["lat"], start_loc["lng"]], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
+                folium.Marker([end_loc["lat"], end_loc["lng"]], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
 
-                #
-                departure_time = datetime.combine(datetime.now().date(), hora_salida)
+                tramos_tabla = []
+                todos_los_puntos = []
 
-                directions_result = gmaps.directions(
-                    origen, destino, mode="driving", departure_time=departure_time
-                )
+                for t in tramos:
 
-                if directions_result:
-                    route = directions_result[0]
-                    legs = route['legs'][0]
+                    # Guardar puntos para el cálculo del zoom automático
+                    todos_los_puntos.extend(t["puntos_polyline"])
 
-                    start_lat = legs['start_location']['lat']
-                    start_lng = legs['start_location']['lng']
+                    # Dibujar tramo en el mapa
+                    folium.PolyLine(
+                        locations=t["puntos_polyline"],
+                        color=t["color"],
+                        weight=6,
+                        opacity=0.8,
+                        tooltip=f"Tramo {t['tramo']} - Hora: {t['hora_paso']} | Riesgo {t['nivel_riesgo']}: {t['probabilidad']:.2%}"
+                    ).add_to(m)
 
-                    # Creamos el mapa
-                    m = folium.Map(location=[start_lat, start_lng], zoom_start=13)
+                    # Estructurar fila para la tabla
+                    tramos_tabla.append({
+                        "Tramo": f"Tramo {t['tramo']}",
+                        "Hora Paso": t["hora_paso"],
+                        "Origen (Lat, Lng)": t["origen_coord"],
+                        "Destino (Lat, Lng)": t["destino_coord"],
+                        "Temperatura (°C)": f"{t['clima']['temperatura']:.1f}",
+                        "Lluvia (mm)": f"{t['clima']['lluvia']:.1f}",
+                        "Viento (km/h)": f"{t['clima']['viento']:.1f}",
+                        "Riesgo": f"{t['probabilidad']:.2%}",
+                        "Nivel": t["nivel_riesgo"]
+                    })
 
-                    # Marcadores
-                    folium.Marker([start_lat, start_lng], tooltip="Inicio", icon=folium.Icon(color="blue", icon="play")).add_to(m)
-                    folium.Marker([legs['end_location']['lat'], legs['end_location']['lng']], tooltip="Destino", icon=folium.Icon(color="red", icon="stop")).add_to(m)
+                # Calcular los límites para ajustar el mapa automáticamente
+                if todos_los_puntos:
+                    min_lat = min(p[0] for p in todos_los_puntos)
+                    max_lat = max(p[0] for p in todos_los_puntos)
+                    min_lon = min(p[1] for p in todos_los_puntos)
+                    max_lon = max(p[1] for p in todos_los_puntos)
+                    m.fit_bounds([[min_lat, min_lon], [max_lat, max_lon]])
 
-                    # Tramos (Riesgos)
-                    for step in legs['steps']:
-                        path = polyline.decode(step['polyline']['points'])
-                        color, riesgo = obtener_color_riesgo()
-                        folium.PolyLine(locations=path, color=color, weight=6, opacity=0.8, tooltip=f"Riesgo: {riesgo:.2f}").add_to(m)
+                # Guardar en memoria de Streamlit
+                st.session_state.mapa_calculado = m
+                st.session_state.detalles_ruta = f"**Distancia total:** {resumen['distancia_total']} | **Duración estimada:** {resumen['duracion_estimada']} | **Tramos:** {resumen['total_tramos']} | **Riesgo Máximo:** {resumen['riesgo_maximo_ruta']:.2%}"
+                st.session_state.tramos_info = tramos_tabla
 
-                    # GUARDAMOS EL RESULTADO EN LA MEMORIA
-                    st.session_state.mapa_calculado = m
-                    st.session_state.detalles_ruta = f"**Distancia total:** {legs['distance']['text']} | **Duración estimada:** {legs['duration']['text']}"
+            else:
+                error_detail = response.json().get("detail", "Error desconocido en el servidor.")
+                st.error(f"Error de la API ({response.status_code}): {error_detail}")
 
-                else:
-                    st.warning("No se encontró una ruta válida.")
+        except Exception as e:
+            st.error(f"Error de conexión con el backend: {e}")
 
-            except Exception as e:
-                st.error(f"Error al conectar con Google Maps: {e}")
-
-# --- Render del mapa ---
-
+# --- RENDERING DE LA INTERFAZ ---
 if st.session_state.mapa_calculado is not None:
-    folium_static(st.session_state.mapa_calculado, width=900, height=500)
+    st_folium(st.session_state.mapa_calculado, use_container_width=True, height=500, returned_objects=[])
     st.success(st.session_state.detalles_ruta)
+
+    st.subheader("📋 Detalle de Tramos de la Ruta")
+    df_tramos = pd.DataFrame(st.session_state.tramos_info)
+    st.dataframe(df_tramos, use_container_width=True)
+
 else:
-    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11)
-    folium_static(mapa_por_defecto, width=900, height=500)
+    mapa_por_defecto = folium.Map(location=[4.6482, -74.1953], zoom_start=11, 
+                               tiles='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+                               attr='Esri')
+    st_folium(mapa_por_defecto, use_container_width=True, height=500, returned_objects=[])
