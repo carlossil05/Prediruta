@@ -1,22 +1,3 @@
-# Frontend (Streamlit & Visualización)
-streamlit
-googlemaps
-polyline
-folium
-streamlit-folium
-python-dotenv
-
-# Backend (FastAPI & Servidor web)
-fastapi
-uvicorn
-pydantic
-dill
-requests
-
-# Machine Learning & Datos
-xgboost
-scikit-learn
-pandas
-numpy
-joblib
-scipy
+# Entorno local completo
+-r requirements.front.txt
+-r requirements.api.txt

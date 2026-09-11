@@ -1,20 +1,19 @@
-# 1. Construir la imagen de la API
+# Ejecutar estos comandos desde la carpeta app.
+
+# 1. Construir y ejecutar la API. La clave de Google solo llega al backend.
 docker build -f Dockerfile.api -t prediruta-api .
+docker run -d -p 8000:8000 --env-file .env --name api_local prediruta-api
 
-docker run -d -p 8000:8000 --name api_local prediruta-api
-
-# 2. Construir la imagen de Streamlit
+# 2. Construir y ejecutar Streamlit.
 docker build -f Dockerfile.front -t prediruta-front .
+docker run -d -p 8501:8501 --env-file .env -e API_URL="http://host.docker.internal:8000/predict" --name front_local prediruta-front
 
-docker run -d -p 8501:8501 -e GOOGLE_APIKEY="YOUR_API_KEY" -e API_URL="http://host.docker.internal:8000/predict" --name front_local prediruta-front
-
-
-#Acceder a la app de streamlit
+# Aplicación
 http://localhost:8501
 
-
-#Acceder a la API
+# Documentación interactiva de la API
 http://localhost:8000/docs
 
-#Detener Docker
-docker stop api_local front_local; docker rm api_local front_local
+# Detener y retirar los contenedores
+docker stop api_local front_local
+docker rm api_local front_local
