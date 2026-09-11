@@ -3,5 +3,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /app
 COPY requirements.front.txt /app/requirements.front.txt
 RUN pip install --no-cache-dir -r requirements.front.txt
+COPY .streamlit/ /app/.streamlit/
 COPY front/ /app/front/
-CMD ["sh", "-c", "streamlit run front/front_streamlit.py --server.port=${PORT:-8501} --server.address=0.0.0.0"]
+CMD ["sh", "-c", "streamlit run front/front_streamlit.py --server.port=${PORT:-8501} --server.address=0.0.0.0 --theme.base=light --theme.primaryColor=#14777a --theme.backgroundColor=#fcfefe --theme.secondaryBackgroundColor=#f5f9f8 --theme.textColor=#12324b"]
