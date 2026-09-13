@@ -32,7 +32,7 @@ class ServicioExternoError(RuntimeError):
 def obtener_referencia_vial(latitud: float, longitud: float) -> str | None:
     """Convierte una coordenada en una calle y sector comprensibles.
 
-    Se usa únicamente en los sectores destacados. La geocodificación no forma
+    Se usa para nombrar los límites de los tramos. La geocodificación no forma
     parte de la predicción y, si falla, el análisis principal sigue disponible.
     """
 
@@ -155,12 +155,12 @@ def _consultar_google_routes(
         "destination": destino,
         "intermediates": intermedios or [],
         "travelMode": "DRIVE",
-        "routingPreference": "TRAFFIC_AWARE",
-        "departureTime": (
-            departure_time.astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        ),
+        # Es el modo de mayor calidad de Routes y el equivalente al cálculo
+        # empleado por Google Maps. Priorizamos precisión sobre latencia.
+        "routingPreference": "TRAFFIC_AWARE_OPTIMAL",
+        # PrediRuta presenta una planeación conservadora: usamos la estimación
+        # alta de tráfico, equivalente al extremo superior esperado del viaje.
+        "trafficModel": "PESSIMISTIC",
         "computeAlternativeRoutes": False,
         "polylineQuality": "HIGH_QUALITY",
         "polylineEncoding": "ENCODED_POLYLINE",
@@ -168,6 +168,15 @@ def _consultar_google_routes(
         "regionCode": "CO",
         "units": "METRIC",
     }
+    # Compute Routes usa el instante de la solicitud cuando departureTime se
+    # omite. Esto permite consultar "ahora" sin que el minuto seleccionado se
+    # vuelva inválido por los segundos empleados en enviar el formulario.
+    if departure_time > datetime.now(departure_time.tzinfo):
+        cuerpo["departureTime"] = (
+            departure_time.astimezone(timezone.utc)
+            .isoformat()
+            .replace("+00:00", "Z")
+        )
     campos = ",".join(
         [
             "routes.distanceMeters",
@@ -304,6 +313,38 @@ def obtener_tiempos_google_por_tramo(
             hora_tramo.timestamp() + duracion, tz=hora_tramo.tzinfo
         )
     return resultados
+
+
+def ajustar_tiempos_a_duracion_total(
+    tiempos: list[dict], duracion_total_s: float
+) -> list[dict]:
+    """Hace que el reparto por tramos cierre con la ETA de la ruta principal.
+
+    La ruta principal es la fuente autoritativa que ve el usuario. La segunda
+    consulta solo reparte esa duración entre los límites de los clusters y, al
+    introducir waypoints, Google podría reconstruir ligeramente el recorrido.
+    Conservamos la proporción de sus legs, pero nunca una ETA total distinta.
+    """
+
+    if not tiempos:
+        return []
+    total_tramos = sum(float(tiempo["duracion_s"]) for tiempo in tiempos)
+    if total_tramos <= 0 or duracion_total_s <= 0:
+        raise ServicioExternoError(
+            "Google Routes no devolvió duraciones positivas para el recorrido."
+        )
+
+    factor = float(duracion_total_s) / total_tramos
+    ajustados: list[dict] = []
+    acumulado = 0.0
+    for indice, tiempo in enumerate(tiempos):
+        if indice == len(tiempos) - 1:
+            duracion = float(duracion_total_s) - acumulado
+        else:
+            duracion = float(tiempo["duracion_s"]) * factor
+            acumulado += duracion
+        ajustados.append({**tiempo, "duracion_s": duracion})
+    return ajustados
 
 
 def _elevacion_climatica_mas_cercana(latitud: float, longitud: float) -> float:
