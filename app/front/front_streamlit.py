@@ -17,7 +17,7 @@ from google_maps_components import (
     mostrar_mapa_resultado,
     seleccionar_lugar,
 )
-from project_info import mostrar_informacion_proyecto
+from project_info import BRAND_ICON, icono_marca, mostrar_informacion_proyecto
 
 
 # En local se lee app/.env. En despliegue estas variables llegan del entorno.
@@ -52,7 +52,7 @@ SERVICIOS_VEHICULO = {
 
 st.set_page_config(
     page_title="PrediRuta | Planea tu trayecto",
-    page_icon="🛣️",
+    page_icon=str(BRAND_ICON),
     layout="wide",
     initial_sidebar_state="collapsed",
 )
@@ -92,7 +92,7 @@ st.markdown(
     .predi-logo {align-items:center;background:linear-gradient(145deg,#16878a,#0f6467);
       border-radius:14px;box-shadow:0 8px 20px rgba(20,119,122,.2);color:#fff;
       display:flex;flex:0 0 56px;height:56px;justify-content:center;width:56px;}
-    .predi-logo .ui-icon{height:29px;width:29px}
+    .predi-logo img{border-radius:inherit;display:block;height:100%;object-fit:cover;width:100%}
     .predi-title {color:var(--navy);font-size:var(--text-display);font-weight:800;
       letter-spacing:-.045em;line-height:1.08;}
     .predi-subtitle {color:var(--muted);font-size:var(--text-body);line-height:1.45;
@@ -173,14 +173,6 @@ st.markdown(
     div[data-testid="stButton"] button[kind="primary"]:disabled{color:#fff!important;opacity:.72}
     div[data-testid="stButton"] button[kind="primary"]:hover {background:#105f62;}
 
-    /* Explicación breve de la vista previa */
-    .analysis-guide{margin:0;padding:.05rem}.analysis-title{margin-bottom:.65rem}
-    .analysis-title .panel-icon{background:#e6f3f2}.guide-grid{display:grid;
-      grid-template-columns:repeat(3,1fr);gap:.55rem}
-    .guide-item{background:var(--surface-soft);border:1px solid #e0ebeb;border-radius:var(--radius-inner);
-      color:var(--muted);font-size:var(--text-small);line-height:1.4;min-height:116px;padding:.8rem .78rem}
-    .guide-item b{align-items:center;color:var(--navy);display:flex;font-size:var(--text-body);
-      gap:.35rem;line-height:1.25;margin-bottom:.2rem}.guide-item .ui-icon{height:16px;width:16px}
     .coverage-banner{align-items:center;background:linear-gradient(90deg,#e8f7f5,#f4fbfa);
       border:1px solid #cfe6e2;border-radius:var(--radius-inner);color:#50707a;display:flex;
       font-size:var(--text-small);gap:.6rem;margin-top:.5rem;min-height:54px;padding:.42rem .65rem}
@@ -195,7 +187,7 @@ st.markdown(
     .st-key-result_header [data-testid="stHorizontalBlock"]{align-items:center}
     .result-brand{align-items:center;display:flex;gap:.7rem;min-height:50px}
     .result-brand .predi-logo{border-radius:12px;flex-basis:46px;height:46px;width:46px}
-    .result-brand .predi-logo .ui-icon{height:24px;width:24px}.result-brand-title{color:var(--navy);
+    .result-brand-title{color:var(--navy);
       font-size:clamp(1.5rem,1.55vw,1.75rem);font-weight:850;letter-spacing:-.04em;line-height:1.08}
     .result-brand-copy{color:var(--muted);font-size:var(--text-small);margin:.15rem 0 0}
     .result-project-link{align-items:center;background:#fff;border:1px solid #cbdde1;
@@ -231,37 +223,36 @@ st.markdown(
     .result-panel-heading .ui-icon{color:var(--teal);height:22px;width:22px}.result-panel-heading b{
       color:var(--navy);display:block;font-size:var(--text-body);line-height:1.2}
     .result-panel-heading span{color:var(--muted);display:block;font-size:var(--text-small);margin-top:.08rem}
-    .result-reading{display:flex;flex-direction:column;gap:.72rem;justify-content:space-between;
-      min-height:414px}.result-reading-lead{align-items:flex-start;
+    .result-reading{display:flex;flex-direction:column;gap:.58rem;min-height:454px}
+    .result-map-note{align-items:center;
       background:linear-gradient(90deg,#eaf8f7,#f2fbfd);border:1px solid #cfe8e6;
       border-radius:var(--radius-inner);display:grid;gap:.7rem;grid-template-columns:44px 1fr;
-      min-height:82px;padding:.72rem .78rem}
-    .result-reading-lead .summary-icon{height:42px;width:42px}.result-reading-lead b{color:var(--navy);
-      display:block;font-size:var(--text-body);line-height:1.3}.result-reading-lead span{color:var(--muted);
-      display:block;font-size:var(--text-small);line-height:1.42;margin-top:.18rem;overflow-wrap:anywhere}
-    .result-mini-grid{display:grid;gap:.55rem;grid-template-columns:repeat(4,minmax(0,1fr))}
+      min-height:68px;padding:.62rem .72rem}
+    .result-map-note .summary-icon{height:40px;width:40px}.result-map-note b{color:var(--navy);
+      display:block;font-size:var(--text-body);line-height:1.3}.result-map-note span{color:var(--muted);
+      display:block;font-size:var(--text-small);line-height:1.42;margin-top:.12rem;overflow-wrap:anywhere}
+    .result-mini-grid{display:grid;gap:.55rem;grid-template-columns:repeat(2,minmax(0,1fr))}
     .result-mini{align-items:center;background:#fff;border:1px solid var(--line);border-radius:var(--radius-inner);
       display:grid;gap:.5rem;grid-template-columns:34px minmax(0,1fr);min-height:66px;padding:.52rem}
     .result-mini .summary-icon{height:32px;width:32px}.result-mini strong{color:var(--navy);
       display:block;font-size:.9rem;line-height:1.1}.result-mini small{color:var(--muted);display:block;
       font-size:var(--text-small);line-height:1.32;margin-top:.12rem;overflow-wrap:anywhere}.result-mini.high .summary-icon{background:#ffedef;color:#d93e54}
-    .result-mini.medium .summary-icon{background:#fff2df;color:#ee9a32}
-    .result-meaning-grid{display:grid;gap:.5rem;grid-template-columns:1fr 1fr}.result-meaning{
-      background:#f9fbfc;border:1px solid var(--line);border-radius:var(--radius-inner);display:grid;
-      gap:.55rem;grid-template-columns:32px 1fr;min-height:80px;padding:.62rem}.result-meaning i{
-      align-items:center;background:#e3f4f3;border-radius:50%;color:var(--teal);display:flex;font-style:normal;
-      font-weight:850;height:30px;justify-content:center;width:30px}.result-meaning.warning i{
-      background:#ffedef;color:#d93e54}.result-meaning b{color:var(--navy);display:block;font-size:.78rem}
-    .result-meaning span{color:var(--muted);display:block;font-size:var(--text-small);line-height:1.42;margin-top:.14rem}
-    .result-how{background:linear-gradient(100deg,#f4fbfa,#eef7ff);border:1px solid #d9e8ea;
-      border-radius:var(--radius-inner);padding:.7rem .75rem}.result-how-head{align-items:center;display:flex;
-      gap:.6rem;justify-content:space-between;margin-bottom:.55rem}.result-how-head b{color:var(--navy);font-size:.76rem}
-    .result-how-head a{background:#fff;border:1px solid #97ced0;border-radius:8px;color:var(--teal)!important;
-      font-size:.66rem;font-weight:800;padding:.32rem .55rem;text-decoration:none!important}.result-how-grid{
-      display:grid;gap:.7rem;grid-template-columns:repeat(3,minmax(0,1fr))}.result-how-step{align-items:center;
-      color:var(--muted);display:grid;font-size:var(--text-small);gap:.48rem;grid-template-columns:28px minmax(0,1fr);line-height:1.4}
-    .result-how-step i{align-items:center;background:var(--teal);border-radius:50%;color:#fff;display:flex;
-      font-style:normal;font-weight:800;height:28px;justify-content:center;width:28px}
+    .result-guide{background:linear-gradient(100deg,#f8fbfb,#eef7ff);border:1px solid #d9e8ea;
+      border-radius:var(--radius-inner);display:flex;flex:1;flex-direction:column;padding:.7rem .75rem}
+    .result-guide-head{align-items:center;display:flex;gap:.6rem;justify-content:space-between;
+      margin-bottom:.58rem}.result-guide-head b{color:var(--navy);font-size:.78rem}
+    .result-guide-head a{background:#fff;border:1px solid #97ced0;border-radius:8px;
+      color:var(--teal)!important;font-size:.66rem;font-weight:800;padding:.32rem .55rem;
+      text-decoration:none!important;white-space:nowrap}
+    .result-guide-grid{display:grid;gap:.6rem;grid-template-columns:1fr 1fr}.result-guide-item{
+      color:var(--muted);display:grid;font-size:var(--text-small);gap:.48rem;
+      grid-template-columns:28px minmax(0,1fr);line-height:1.42}.result-guide-item i{
+      align-items:center;background:#e3f4f3;border-radius:50%;color:var(--teal);display:flex;
+      font-style:normal;font-weight:850;height:28px;justify-content:center;width:28px}
+    .result-guide-item.warning i{background:#ffedef;color:#d93e54}.result-guide-item b{
+      color:var(--navy);display:block;font-size:.74rem;margin-bottom:.1rem}
+    .result-guide-foot{border-top:1px solid #dce9ec;color:var(--muted);font-size:var(--text-small);
+      line-height:1.4;margin-top:auto;padding-top:.55rem}
     .highlight-shell,.detail-shell{background:#fff;border:1px solid var(--line);border-radius:var(--radius);
       box-shadow:var(--shadow);padding:.65rem .8rem}.highlight-shell{margin-bottom:.75rem}.highlight-grid{align-items:stretch;display:grid;gap:.7rem;
       grid-template-columns:repeat(3,minmax(0,1fr))}.highlight-grid.count-1{grid-template-columns:1fr}
@@ -340,15 +331,13 @@ st.markdown(
       .feature-chip>div:last-child>span{display:none}.panel-title{margin-bottom:.45rem}.panel-icon{flex-basis:40px;
         height:40px;width:40px}.panel-title strong{font-size:var(--text-heading)}
       .panel-title span{font-size:var(--text-small)}div[data-testid="stVerticalBlockBorderWrapper"]{
-        border-radius:14px}.panel-tag{display:none}.guide-grid{grid-template-columns:1fr;gap:.35rem}
-      .guide-item{min-height:auto;padding:.5rem}.guide-item span{display:none}.coverage-banner{align-items:center;
+        border-radius:14px}.panel-tag{display:none}.coverage-banner{align-items:center;
         line-height:1.35;margin-top:.4rem;min-height:64px;padding:.55rem}.coverage-banner a{display:none}
       .coverage-copy{display:flex;flex-direction:column}.coverage-icon{flex-basis:34px;height:34px;width:34px}
       .result-brand-title{font-size:1.45rem}.result-route-strip{
         grid-template-columns:repeat(2,1fr)}.result-route-item{border-bottom:1px solid #e1eaec;
-        min-height:48px}.result-route-item:nth-child(2n){border-right:0}.result-reading{min-height:0}.result-mini-grid{
-        grid-template-columns:repeat(2,1fr)}.result-meaning-grid{grid-template-columns:1fr}
-      .result-how-grid,.highlight-grid{grid-template-columns:1fr}.detail-head,.detail-row{min-width:1040px}
+        min-height:48px}.result-route-item:nth-child(2n){border-right:0}.result-reading{min-height:0}
+      .result-guide-grid,.highlight-grid{grid-template-columns:1fr}.detail-head,.detail-row{min-width:1040px}
       .highlight-card{min-height:auto}
       .highlight-top{flex-wrap:wrap}
       .method-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.method-card{min-height:132px}
@@ -357,7 +346,7 @@ st.markdown(
       .block-container{padding:.4rem .55rem 1.5rem}.predi-title{font-size:1.58rem}
       .feature-ribbon{grid-template-columns:repeat(3,minmax(0,1fr))}.feature-chip{justify-content:center}
       .feature-chip>div:last-child{min-width:0}.feature-chip b{overflow:hidden;text-overflow:ellipsis;
-        white-space:nowrap}.panel-title span{line-height:1.3}.analysis-guide h3{margin-bottom:.35rem}
+        white-space:nowrap}.panel-title span{line-height:1.3}
       .method-grid{grid-template-columns:1fr}.method-card{grid-template-columns:38px minmax(0,1fr);
         min-height:auto;padding:.65rem}.method-card-icon{height:38px;width:38px}
       .method-card-icon .ui-icon{height:20px;width:20px}.method-intro{font-size:var(--text-small)}
@@ -427,7 +416,7 @@ def encabezado(titulo: str, subtitulo: str, con_arte: bool = False) -> None:
     arte = arte_cabecera() if con_arte else ""
     st.markdown(
         f"""
-        {arte}<div class="predi-brand"><div class="predi-logo">{icono("ruta")}</div>
+        {arte}<div class="predi-brand"><div class="predi-logo">{icono_marca()}</div>
         <div class="predi-title">{html.escape(titulo)}</div></div>
         <p class="predi-subtitle">{html.escape(subtitulo)}</p>
         """,
@@ -688,22 +677,7 @@ def mostrar_planeacion() -> None:
             )
             mostrar_mapa_previo(
                 MAPS_BROWSER_KEY, origen, destino, salida.isoformat(),
-                "mapa_planeacion", height=430,
-            )
-        with st.container(border=True):
-            st.markdown(
-                f"""
-                <div class="analysis-guide">
-                  <div class="panel-title analysis-title"><div class="panel-icon">{icono("barras")}</div><div>
-                    <strong>¿Qué analiza PrediRuta?</strong></div></div>
-                  <div class="guide-grid">
-                    <div class="guide-item"><b>{icono("ubicacion")} Usa la ruta entregada por Google Maps</b><span>Tomamos el recorrido, con sus vías y tramos, tal como lo genera Google Maps.</span></div>
-                    <div class="guide-item"><b>{icono("barras")} Evalúa la criticidad por tramos</b><span>Comparamos cada segmento con patrones históricos de siniestros.</span></div>
-                    <div class="guide-item"><b>{icono("clima_color")} Complementa con fecha, hora y contexto</b><span>Consideramos el clima previsto y tu información complementaria para una mejor interpretación.</span></div>
-                  </div>
-                </div>
-                """,
-                unsafe_allow_html=True,
+                "mapa_planeacion", height=610,
             )
         st.markdown(
             f"""
@@ -794,61 +768,6 @@ def _nombre_tramo(tramo: dict) -> str:
     return "Ubicación del tramo no disponible"
 
 
-def _grupos_tramos_altos(tramos: list[dict]) -> list[list[dict]]:
-    """Agrupa coincidencias altas consecutivas para leerlas como recorridos."""
-
-    ordenados = sorted(
-        (tramo for tramo in tramos if tramo.get("nivel_criticidad") == "Alto"),
-        key=lambda tramo: int(tramo.get("tramo", 0)),
-    )
-    grupos: list[list[dict]] = []
-    for tramo in ordenados:
-        if (
-            grupos
-            and int(tramo.get("tramo", 0))
-            == int(grupos[-1][-1].get("tramo", 0)) + 1
-        ):
-            grupos[-1].append(tramo)
-        else:
-            grupos.append([tramo])
-    return grupos
-
-
-def _lectura_mayor_similitud(tramos: list[dict]) -> tuple[str, str]:
-    """Describe los recorridos continuos que tienen coincidencia alta."""
-
-    grupos = _grupos_tramos_altos(tramos)
-    if not grupos:
-        return (
-            "Sin coincidencias históricas altas en este horario",
-            "Ningún tramo del recorrido quedó entre los hallazgos prioritarios.",
-        )
-
-    descripciones = []
-    for grupo in grupos:
-        primera_ubicacion = grupo[0].get("ubicacion_tramo") or {}
-        ultima_ubicacion = grupo[-1].get("ubicacion_tramo") or {}
-        desde = primera_ubicacion.get("desde")
-        hasta = ultima_ubicacion.get("hasta")
-        if not desde or not hasta:
-            # Compatibilidad temporal con resultados anteriores a la nueva API.
-            recorrido = " → ".join(
-                nombre for nombre in (_nombre_tramo(tramo) for tramo in grupo)
-            )
-        else:
-            recorrido = f"{desde} → {hasta}"
-        hora_inicio = grupo[0]["hora_paso"].split(" - ")[0]
-        hora_fin = grupo[-1]["hora_paso"].split(" - ")[-1]
-        descripciones.append(f"{recorrido} ({hora_inicio}–{hora_fin})")
-
-    if len(descripciones) == 1:
-        return "Tramo con mayor coincidencia histórica", descripciones[0]
-    return (
-        f"Mayor coincidencia histórica en {len(descripciones)} partes del recorrido",
-        " · ".join(descripciones),
-    )
-
-
 def _tarjeta_destacada(tramo: dict) -> str:
     etiqueta, _ = _etiqueta_coincidencia(tramo)
     clima = tramo["clima"]
@@ -898,7 +817,7 @@ def _comparar_otro_horario(consulta: dict, salida_actual: datetime) -> None:
 
     payload_base = consulta.get("payload")
     with st.popover(
-        "Comparar otro horario", icon=":material/sync:",
+        "Analizar otro horario", icon=":material/sync:",
         disabled=not bool(payload_base), width="stretch",
     ):
         st.markdown("**Mismo trayecto, otra hora**")
@@ -951,7 +870,7 @@ def mostrar_resultado() -> None:
         )
         with columna_titulo:
             st.markdown(
-                f'<div class="result-brand"><div class="predi-logo">{icono("ruta")}</div><div>'
+                f'<div class="result-brand"><div class="predi-logo">{icono_marca()}</div><div>'
                 '<div class="result-brand-title">PrediRuta | Análisis de tu trayecto</div>'
                 '<div class="result-brand-copy">Compara tu recorrido con patrones históricos y '
                 'condiciones previstas de paso.</div></div></div>',
@@ -989,15 +908,13 @@ def mostrar_resultado() -> None:
     )
 
     altos = [tramo for tramo in tramos if tramo["nivel_criticidad"] == "Alto"]
-    medios = [tramo for tramo in tramos if tramo["nivel_criticidad"] == "Medio"]
     lluvias = [float(tramo["clima"]["probabilidad_precipitacion"]) for tramo in tramos]
     lluvia_texto = (
         f"{min(lluvias):.0f}% – {max(lluvias):.0f}%"
         if min(lluvias) != max(lluvias) else f"{max(lluvias):.0f}%"
     )
-    lectura, lectura_nota = _lectura_mayor_similitud(tramos)
 
-    columna_mapa, columna_lectura = st.columns([1.3, 1], gap="small")
+    columna_mapa, columna_lectura = st.columns([1.75, .75], gap="small")
     with columna_mapa:
         with st.container(border=True):
             st.markdown(
@@ -1005,32 +922,26 @@ def mostrar_resultado() -> None:
                 '<span>La ruta la define Google Maps; PrediRuta analiza sus tramos.</span></div></div>',
                 unsafe_allow_html=True,
             )
-            mostrar_mapa_resultado(MAPS_BROWSER_KEY, data, "mapa_resultado", height=360)
+            mostrar_mapa_resultado(MAPS_BROWSER_KEY, data, "mapa_resultado", height=440)
     with columna_lectura:
         with st.container(border=True):
             st.markdown(
                 f"""
                 <div class="result-reading">
                   <div class="result-panel-heading">{icono("barras")}<div><b>Lectura del resultado</b></div></div>
-                  <div class="result-reading-lead"><div class="summary-icon">{icono("barras")}</div><div>
-                    <b>{html.escape(lectura)}</b><span>{html.escape(lectura_nota)}</span></div></div>
+                  <div class="result-map-note"><div class="summary-icon">{icono("ubicacion")}</div><div>
+                    <b>Explora cada tramo en el mapa</b><span>Haz clic sobre una línea del recorrido para consultar su hora de paso, clima y lectura del modelo.</span></div></div>
                   <div class="result-mini-grid">
                     <div class="result-mini high"><div class="summary-icon">!</div><div><strong>{len(altos)}</strong><small>tramos con coincidencia alta</small></div></div>
-                    <div class="result-mini medium"><div class="summary-icon">!</div><div><strong>{len(medios)}</strong><small>tramos con coincidencia media</small></div></div>
                     <div class="result-mini"><div class="summary-icon">{icono("lluvia")}</div><div><small>Lluvia prevista</small><strong>{lluvia_texto}</strong></div></div>
-                    <div class="result-mini"><div class="summary-icon">{icono("tramos")}</div><div><strong>{len(tramos)}</strong><small>tramos analizados</small></div></div>
                   </div>
-                  <div class="result-meaning-grid">
-                    <div class="result-meaning"><i>i</i><div><b>Qué significa</b><span>Algunos tramos se parecen más a escenarios históricos observados por el modelo.</span></div></div>
-                    <div class="result-meaning warning"><i>!</i><div><b>Qué no significa</b><span>No representa una probabilidad individual de accidente ni una recomendación automática.</span></div></div>
-                  </div>
-                  <div class="result-how"><div class="result-how-head"><b>▣ &nbsp; Cómo interpretar esta vista</b>
+                  <div class="result-guide"><div class="result-guide-head"><b>Cómo interpretar la lectura</b>
                     <a href="?vista=proyecto" target="_self">Conoce el proyecto &nbsp;→</a></div>
-                    <div class="result-how-grid">
-                      <div class="result-how-step"><i>1</i><span>Ubica los tramos resaltados en el mapa.</span></div>
-                      <div class="result-how-step"><i>2</i><span>Revisa su hora de paso y el clima previsto.</span></div>
-                      <div class="result-how-step"><i>3</i><span>Consulta la tabla inferior para leer todo el recorrido.</span></div>
+                    <div class="result-guide-grid">
+                      <div class="result-guide-item"><i>i</i><div><b>Qué significa</b><span>Algunos tramos se parecen más a escenarios históricos observados por el modelo.</span></div></div>
+                      <div class="result-guide-item warning"><i>!</i><div><b>Qué no significa</b><span>No representa una probabilidad individual de accidente ni una recomendación automática.</span></div></div>
                     </div>
+                    <div class="result-guide-foot">Los tramos destacados aparecen debajo; la tabla conserva el detalle completo del recorrido.</div>
                   </div>
                 </div>
                 """, unsafe_allow_html=True,

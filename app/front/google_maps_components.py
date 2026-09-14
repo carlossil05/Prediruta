@@ -247,6 +247,18 @@ body.result #legend{{border-radius:0;bottom:0;box-shadow:none;box-sizing:border-
   font-weight:700;padding:4px 7px;white-space:nowrap}}
 .segment-divider{{background:#fff;border:2px solid rgba(40,75,83,.42);border-radius:50%;
   box-shadow:0 1px 4px rgba(20,40,50,.14);height:7px;width:7px}}
+.gm-style-iw-c{{max-height:none!important;max-width:330px!important;padding:10px 12px!important}}
+.gm-style-iw-d{{max-height:none!important;overflow:hidden!important;padding:0!important}}
+.route-popup{{color:#284453;font:12px/1.4 Arial,sans-serif;max-width:285px;min-width:230px}}
+.route-popup-head{{align-items:center;display:flex;gap:8px;justify-content:space-between;
+  margin-bottom:6px;padding-right:18px}}.route-popup-head b{{color:#17324d;font-size:13px}}
+.route-popup-level{{background:#edf4f5;border-radius:999px;color:#425966;font-size:10px;
+  font-weight:700;padding:3px 7px;white-space:nowrap}}.route-popup-level.high{{background:#ffedef;color:#c9374d}}
+.route-popup-level.medium{{background:#fff2df;color:#c97918}}
+.route-popup-route{{color:#17324d;font-weight:700;line-height:1.35;margin-bottom:6px}}
+.route-popup-meta{{background:#f5f9f9;border-radius:8px;display:grid;gap:3px;padding:6px 8px}}
+.route-popup-state{{border-top:1px solid #efd9dc;color:#9d413a;margin-top:7px;padding-top:6px}}
+.route-popup-note{{color:#6a7f89;font-size:10px;line-height:1.35;margin-top:6px}}
 </style></head><body class="{modo}"><div id="shell"><div id="map"></div>
 <div id="preview-details">
   <div class="preview-detail"><b id="preview-distance">—</b><small>Distancia</small></div>
@@ -359,18 +371,24 @@ async function initPrediRutaMap(){{
     const ubicacion=tramo.ubicacion_tramo||tramo.ubicacion_sector||{{}};
     const desde=ubicacion.desde||`${{path[0].lat.toFixed(5)}}, ${{path[0].lng.toFixed(5)}}`;
     const hasta=ubicacion.hasta||`${{path[path.length-1].lat.toFixed(5)}}, ${{path[path.length-1].lng.toFixed(5)}}`;
+    const nivel=String(tramo.nivel_criticidad||'Bajo');
+    const etiquetaNivel=nivel==='Alto'?'Coincidencia alta':
+      (nivel==='Medio'?'Coincidencia media':'Sin hallazgo destacado');
+    const claseNivel=nivel==='Alto'?'high':(nivel==='Medio'?'medium':'low');
     let estadoHtml='';
-    if(estado?.probabilidades){{const p=estado.probabilidades;
-      estadoHtml='<hr><b>Estado condicional si ocurre un siniestro</b><br>'+ 
-        `Herido ${{(Number(p.HERIDO)*100).toFixed(0)}}% · Ileso ${{(Number(p.ILESO)*100).toFixed(0)}}% · Muerto ${{(Number(p.MUERTO)*100).toFixed(0)}}%`;}}
+    if(estado?.probabilidades&&estado?.estado_mas_probable){{
+      const clave=estado.estado_mas_probable;
+      const porcentaje=Number(estado.probabilidades[clave]||0)*100;
+      const nombre=String(clave).toLocaleLowerCase('es-CO');
+      estadoHtml=`<div class="route-popup-state"><b>Si ocurriera un siniestro:</b> ${{safe(nombre)}} sería el estado más compatible (${{porcentaje.toFixed(0)}}%).</div>`;
+    }}
     line.addListener('click',event=>{{
-      info.setContent(`<div style="font:13px Arial;line-height:1.55;max-width:310px;color:#263f4d">`+
-        `<b>Tramo ${{safe(tramo.tramo)}} · Nivel ${{safe(tramo.nivel_criticidad)}}</b><br>`+
-        `<span>${{safe(desde)}} → ${{safe(hasta)}}</span><br>`+
-        `Hora estimada: ${{safe(tramo.hora_paso)}} · ${{safe(tramo.duracion)}}<br>`+
-        `Clima: ${{safe(clima.condicion)}} · ${{Number(clima.temperatura).toFixed(1)}} °C<br>`+
-        `Posibilidad de lluvia: ${{Number(clima.probabilidad_precipitacion).toFixed(0)}}%`+estadoHtml+
-        '<hr><small>Comparación relativa con patrones históricos; no es una probabilidad individual.</small></div>');
+      info.setContent(`<div class="route-popup">`+
+        `<div class="route-popup-head"><b>Tramo ${{safe(tramo.tramo)}}</b><span class="route-popup-level ${{claseNivel}}">${{safe(etiquetaNivel)}}</span></div>`+
+        `<div class="route-popup-route">${{safe(desde)}} → ${{safe(hasta)}}</div>`+
+        `<div class="route-popup-meta"><span>Hora de paso: <b>${{safe(tramo.hora_paso)}}</b> · ${{safe(tramo.duracion)}}</span>`+
+        `<span>${{safe(clima.condicion)}} · ${{Number(clima.temperatura).toFixed(1)}} °C · lluvia ${{Number(clima.probabilidad_precipitacion).toFixed(0)}}%</span></div>`+
+        estadoHtml+'<div class="route-popup-note">Comparación con patrones históricos; no es una probabilidad individual de accidente.</div></div>');
       info.setPosition(event.latLng);info.open({{map}});
     }});
     if(puntosClima.has(index)){{
@@ -384,7 +402,12 @@ async function initPrediRutaMap(){{
   const start=point(data.start),end=point(data.end);
   if(start)addPin(start,'A','#14777a','Origen');
   if(end)addPin(end,'B','#17324d','Destino');
-  if(!bounds.isEmpty())map.fitBounds(bounds,30);
+  if(!bounds.isEmpty()){{
+    map.fitBounds(bounds,{{top:22,right:22,bottom:52,left:22}});
+    google.maps.event.addListenerOnce(map,'idle',()=>{{
+      if(Number(map.getZoom())>16)map.setZoom(16);
+    }});
+  }}
   }}catch(error){{
     console.error('No fue posible iniciar el mapa de PrediRuta.',error);
     empty.innerHTML='<b>No pudimos cargar el mapa</b><br>'+safe(error?.message||
