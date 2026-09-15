@@ -51,7 +51,7 @@ SERVICIOS_VEHICULO = {
 
 
 st.set_page_config(
-    page_title="PrediRuta | Planea tu trayecto",
+    page_title="PrediRuta | Analiza la criticidad de cada tramo de tu recorrido",
     page_icon=str(BRAND_ICON),
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -536,16 +536,16 @@ def mostrar_planeacion() -> None:
     columna_encabezado, columna_metodologia = st.columns([4.5, 1.25])
     with columna_encabezado:
         encabezado(
-            "PrediRuta | Planea tu trayecto",
-            "Google Maps calcula la ruta y PrediRuta analiza cada tramo con patrones históricos y clima previsto.",
+            "PrediRuta | Analiza la criticidad de cada tramo de tu recorrido",
+            "PrediRuta analiza los tramos de una ruta en Bogotá y estima su criticidad a partir de patrones históricos de accidentalidad, el contexto del recorrido y el clima previsto. La ruta, los tiempos y el clima son proporcionados por Google.",
             con_arte=True,
         )
     with columna_metodologia:
         st.markdown(
             '<a class="method-link" href="?vista=proyecto" target="_self" '
             'title="Metodología, modelos, resultados y limitaciones">'
-            'Conoce el proyecto →</a><div class="hero-motto">Rutas más seguras<br>'
-            "para un mejor mañana</div>",
+            'Conoce el proyecto →</a><div class="hero-motto">Rutas más seguras comprendiendo<br>'
+            "el contexto de tu recorrido</div>",
             unsafe_allow_html=True,
         )
     st.markdown(
@@ -575,7 +575,7 @@ def mostrar_planeacion() -> None:
             st.markdown(
                 f"""
                 <div class="panel-title"><div class="panel-icon">{icono("ubicacion")}</div><div>
-                <strong>Tu trayecto</strong>
+                <strong>Consulta la criticidad de una ruta</strong>
                 <span>Selecciona origen, destino, fecha y hora. Esta información define el recorrido que analizaremos.</span>
                 </div></div>
                 """,
@@ -611,8 +611,7 @@ def mostrar_planeacion() -> None:
                     help="Google usa esta hora para calcular un escenario alto de tráfico.",
                 )
             st.markdown(
-                f'<div class="field-note">{icono("reloj")}<span>La fecha y la hora influyen '
-                'en el escenario alto de tráfico y en el pronóstico consultado para cada tramo.</span></div>',
+                f'<div class="field-note">{icono("reloj")}<span>La fecha y la hora permiten definir el contexto temporal del recorrido y consultar el pronóstico meteorológico.</span></div>',
                 unsafe_allow_html=True,
             )
 
@@ -741,10 +740,10 @@ def _distancia_legible(tramo: dict) -> str:
 def _etiqueta_coincidencia(tramo: dict) -> tuple[str, str]:
     nivel = tramo.get("nivel_criticidad", "Bajo")
     if nivel == "Alto":
-        return "Coincidencia alta", "high"
+        return "Similitud histórica alta", "high"
     if nivel == "Medio":
-        return "Coincidencia media", "medium"
-    return "Sin hallazgo destacado", "low"
+        return "Similitud histórica media", "medium"
+    return "Similitud histórica baja", "low"
 
 
 def _nombre_tramo(tramo: dict) -> str:
@@ -777,8 +776,8 @@ def _tarjeta_destacada(tramo: dict) -> str:
         probable = estado["estado_mas_probable"].capitalize()
         porcentaje = estado["probabilidades"][estado["estado_mas_probable"]]
         estado_html = (
-            '<div class="highlight-state">Si ocurriera un siniestro: '
-            f"{html.escape(probable)} sería el estado más compatible ({porcentaje:.0%}).</div>"
+            '<div class="highlight-state">Estado más compatible si ocurre un siniestro: '
+            f"{html.escape(probable)} ({porcentaje:.0%}).</div>"
         )
     return (
         f'<div class="highlight-card" style="--card-color:{tramo["color"]}">'
@@ -800,7 +799,7 @@ def _fila_detalle(tramo: dict) -> str:
     estado_html = ""
     if estado:
         probable = estado["estado_mas_probable"].capitalize()
-        estado_html = f'<small>Si ocurriera: {html.escape(probable)}</small>'
+        estado_html = f'<small>Si ocurriera siniestro: {html.escape(probable)}</small>'
     return (
         '<div class="detail-row">'
         f'<b>{tramo["tramo"]}</b><b>{html.escape(hora_paso_legible(tramo))}</b>'
@@ -930,7 +929,7 @@ def mostrar_resultado() -> None:
                 <div class="result-reading">
                   <div class="result-panel-heading">{icono("barras")}<div><b>Lectura del resultado</b></div></div>
                   <div class="result-map-note"><div class="summary-icon">{icono("ubicacion")}</div><div>
-                    <b>Explora cada tramo en el mapa</b><span>Haz clic sobre una línea del recorrido para consultar su hora de paso, clima y lectura del modelo.</span></div></div>
+                    <b>Explora cada tramo en el mapa</b><span>Haz clic sobre una línea del recorrido para consultar su hora de paso, clima y criticidad estimada.</span></div></div>
                   <div class="result-mini-grid">
                     <div class="result-mini high"><div class="summary-icon">!</div><div><strong>{len(altos)}</strong><small>tramos con coincidencia alta</small></div></div>
                     <div class="result-mini"><div class="summary-icon">{icono("lluvia")}</div><div><small>Lluvia prevista</small><strong>{lluvia_texto}</strong></div></div>
@@ -952,7 +951,7 @@ def mostrar_resultado() -> None:
     )
     st.markdown(
         f'<div class="highlight-shell"><div class="result-panel-heading">{icono("ubicacion")}<div>'
-        '<b>Tramos destacados</b><span>Segmentos con mayor similitud histórica dentro de este recorrido.</span>'
+        '<b>Tramos destacados</b><span>Tramos con mayor criticidad estimada dentro del recorrido.</span>'
         f'</div></div><div class="highlight-grid count-{max(1, len(destacados))}">'
         + (
             "".join(_tarjeta_destacada(tramo) for tramo in destacados)
@@ -967,7 +966,7 @@ def mostrar_resultado() -> None:
         '<b>Detalle del recorrido completo</b><span>Todos los tramos del recorrido, en orden.</span>'
         f'</div><span class="detail-heading-count">{len(tramos)} tramos en total</span></div>'
         '<div class="detail-table"><div class="detail-head"><span>#</span><span>Hora</span>'
-        '<span>Tramo</span><span>Lectura del modelo</span><span>Clima</span>'
+        '<span>Tramo</span><span>Criticidad estimada</span><span>Clima</span>'
         '<span>Tiempo / distancia</span></div>'
         + "".join(_fila_detalle(tramo) for tramo in tramos)
         + "</div></div>", unsafe_allow_html=True,
