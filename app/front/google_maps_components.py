@@ -134,7 +134,6 @@ def seleccionar_lugar(
 ) -> dict | None:
     """Muestra un autocompletado y devuelve solo una sugerencia confirmada."""
 
-    icono = "📍" if kind == "origin" else "🏁"
     if not api_key:
         st.text_input(label, placeholder=placeholder, disabled=True, key=f"{key}_off")
         st.caption("Configura GOOGLE_PLACES_APIKEY para buscar lugares.")
@@ -142,7 +141,7 @@ def seleccionar_lugar(
 
     seleccion = st_searchbox(
         partial(_buscar_sugerencias, api_key),
-        label=f"{icono}  {label}",
+        label=label,
         placeholder=placeholder,
         key=key,
         debounce=280,
@@ -150,26 +149,35 @@ def seleccionar_lugar(
         clear_on_submit=False,
         help="Escribe al menos tres caracteres y elige una sugerencia de Google.",
         style_overrides={
+            "wrapper": {"fontSize": "13px"},
             "clear": {"icon": "cross", "fill": "#607581"},
             "dropdown": {"fill": "#14777a"},
             "searchbox": {
                 "control": {
-                    "minHeight": "48px",
+                    "minHeight": "42px",
+                    "height": "42px",
                     "borderRadius": "11px",
                     "borderColor": "#d7e1e5",
                     "boxShadow": "none",
                     "backgroundColor": "#ffffff",
                     "color": "#17324d",
+                    "fontSize": "13px",
                 },
-                "input": {"color": "#17324d", "backgroundColor": "transparent"},
+                "input": {
+                    "color": "#17324d",
+                    "backgroundColor": "transparent",
+                    "fontSize": "13px",
+                    "margin": "0",
+                },
                 "option": {
                     "color": "#17324d",
                     "backgroundColor": "#ffffff",
                     "highlightColor": "#e8f4f3",
+                    "fontSize": "13px",
                 },
-                "placeholder": {"color": "#7a8c96"},
-                "singleValue": {"color": "#17324d"},
-                "menuList": {"maxHeight": "240px"},
+                "placeholder": {"color": "#7a8c96", "fontSize": "13px"},
+                "singleValue": {"color": "#17324d", "fontSize": "13px"},
+                "menuList": {"maxHeight": "220px", "fontSize": "13px"},
             },
         },
     )
@@ -196,6 +204,7 @@ def _documento_mapa(api_key: str, datos: dict) -> str:
 
     clave_url = quote(api_key, safe="")
     datos_json = _datos_json(datos)
+    modo = "preview" if datos.get("mode") == "preview" else "result"
     return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -204,25 +213,63 @@ html,body,#map{{height:100%;margin:0;width:100%;font-family:Arial,sans-serif}}
 body{{background:#edf3f2}}
 #shell{{border:1px solid #dce7e5;border-radius:18px;height:calc(100% - 2px);
   overflow:hidden;position:relative;box-shadow:0 10px 28px rgba(24,55,70,.08)}}
+body.preview #map{{height:calc(100% - 60px)}}
+body.result #map{{height:calc(100% - 40px)}}
+#preview-details{{background:#fff;border-top:1px solid #dce7e5;bottom:0;display:none;
+  grid-template-columns:repeat(4,minmax(0,1fr));height:59px;left:0;position:absolute;
+  right:0;z-index:3}}
+body.preview #preview-details{{display:grid}}
+.preview-detail{{align-items:center;border-right:1px solid #e3ebed;display:flex;
+  flex-direction:column;justify-content:center;min-width:0;padding:5px 8px;text-align:center}}
+.preview-detail:last-child{{border-right:0}} .preview-detail b{{color:#12324b;font-size:13px;
+  line-height:1.2;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+.preview-detail small{{color:#607581;font-size:10px;margin-top:2px}}
 #empty{{background:rgba(255,255,255,.95);border-radius:12px;color:#49616e;
   left:50%;max-width:290px;padding:13px 16px;position:absolute;text-align:center;
   top:50%;transform:translate(-50%,-50%);z-index:4;font-size:13px;line-height:1.45}}
 #empty:empty{{display:none}}
+#route-summary{{align-items:center;background:rgba(255,255,255,.97);border:1px solid #d8e4e7;
+  border-radius:11px;bottom:16px;box-shadow:0 5px 18px rgba(20,40,50,.2);color:#12324b;
+  display:none;font-size:13px;font-weight:800;gap:8px;left:50%;padding:9px 13px;
+  position:absolute;transform:translateX(-50%);white-space:nowrap;z-index:4}}
+#route-summary.show{{display:flex}} #route-summary small{{color:#607581;font-size:11px;font-weight:600}}
+body.preview #route-summary{{bottom:75px}}
 #legend{{align-items:center;background:rgba(255,255,255,.96);border-radius:11px;
   bottom:14px;box-shadow:0 4px 16px rgba(20,40,50,.16);display:none;gap:12px;
   left:14px;padding:9px 12px;position:absolute;z-index:3}}
 #legend.show{{display:flex}} #legend span{{align-items:center;color:#425966;
   display:flex;font-size:11px;font-weight:700;gap:5px}}
 #legend i{{border-radius:50%;height:9px;width:9px}}
+body.result #legend{{border-radius:0;bottom:0;box-shadow:none;box-sizing:border-box;
+  height:40px;justify-content:center;left:0;width:100%}}
 .time-badge{{background:#fff;border:1px solid #d8e1e5;border-radius:9px;
   box-shadow:0 3px 9px rgba(20,40,50,.18);color:#284453;font-size:11px;
   font-weight:700;padding:4px 7px;white-space:nowrap}}
 .segment-divider{{background:#fff;border:2px solid rgba(40,75,83,.42);border-radius:50%;
   box-shadow:0 1px 4px rgba(20,40,50,.14);height:7px;width:7px}}
-</style></head><body><div id="shell"><div id="map"></div><div id="empty"></div>
-<div id="legend"><span><i style="background:#2E8B57"></i>Bajo</span>
-<span><i style="background:#F4A261"></i>Medio</span>
-<span><i style="background:#D1495B"></i>Alto</span></div></div>
+.gm-style-iw-c{{max-height:none!important;max-width:330px!important;padding:10px 12px!important}}
+.gm-style-iw-d{{max-height:none!important;overflow:hidden!important;padding:0!important}}
+.route-popup{{color:#284453;font:12px/1.4 Arial,sans-serif;max-width:285px;min-width:230px}}
+.route-popup-head{{align-items:center;display:flex;gap:8px;justify-content:space-between;
+  margin-bottom:6px;padding-right:18px}}.route-popup-head b{{color:#17324d;font-size:13px}}
+.route-popup-level{{background:#edf4f5;border-radius:999px;color:#425966;font-size:10px;
+  font-weight:700;padding:3px 7px;white-space:nowrap}}.route-popup-level.high{{background:#ffedef;color:#c9374d}}
+.route-popup-level.medium{{background:#fff2df;color:#c97918}}
+.route-popup-route{{color:#17324d;font-weight:700;line-height:1.35;margin-bottom:6px}}
+.route-popup-meta{{background:#f5f9f9;border-radius:8px;display:grid;gap:3px;padding:6px 8px}}
+.route-popup-state{{border-top:1px solid #efd9dc;color:#9d413a;margin-top:7px;padding-top:6px}}
+.route-popup-note{{color:#6a7f89;font-size:10px;line-height:1.35;margin-top:6px}}
+</style></head><body class="{modo}"><div id="shell"><div id="map"></div>
+<div id="preview-details">
+  <div class="preview-detail"><b id="preview-distance">—</b><small>Distancia</small></div>
+  <div class="preview-detail"><b id="preview-duration">—</b><small>Tiempo conservador</small></div>
+  <div class="preview-detail"><b>Ruta de Google</b><small>Recorrido sugerido</small></div>
+  <div class="preview-detail"><b>Bogotá urbana</b><small>Cobertura</small></div>
+</div><div id="empty"></div>
+<div id="route-summary"></div>
+<div id="legend"><span><i style="background:#D1495B"></i>Coincidencia alta</span>
+<span><i style="background:#F4A261"></i>Coincidencia media</span>
+<span><i style="background:#2E8B57"></i>Coincidencia baja</span></div></div>
 <script id="prediruta-data" type="application/json">{datos_json}</script>
 <script>
 const data=JSON.parse(document.getElementById('prediruta-data').textContent);
@@ -255,22 +302,39 @@ async function initPrediRutaMap(){{
 
   if(data.mode==='preview'){{
     const origin=point(data.origin),destination=point(data.destination);
-    if(origin)addPin(origin,'A','#14777a','Origen');
-    if(destination)addPin(destination,'B','#17324d','Destino');
+    const summary=document.getElementById('route-summary');
+    if(origin)addPin(origin,'A','#078a82','Origen');
+    if(destination)addPin(destination,'B','#df3f45','Destino');
     if(origin&&destination){{
       empty.textContent='Calculando vista previa…';
       try{{
-        const request={{origin,destination,travelMode:'DRIVING',fields:['path'],
-          routingPreference:'TRAFFIC_AWARE',polylineQuality:'HIGH_QUALITY'}};
-        if(data.departureTime)request.departureTime=new Date(data.departureTime);
+        const request={{origin,destination,travelMode:'DRIVING',
+          fields:['path','durationMillis','distanceMeters'],
+          routingPreference:'TRAFFIC_AWARE_OPTIMAL',trafficModel:'pessimistic',
+          polylineQuality:'HIGH_QUALITY'}};
+        if(data.departureTime){{
+          const selectedDeparture=new Date(data.departureTime);
+          if(selectedDeparture.getTime()>Date.now())request.departureTime=selectedDeparture;
+        }}
         const result=await Route.computeRoutes(request);
         const route=result.routes?.[0];
         if(!route)throw new Error('Google no devolvió una ruta');
-        route.createPolylines({{polylineOptions:{{strokeColor:'#168487',
-          strokeOpacity:.92,strokeWeight:6}}}}).forEach(line=>line.setMap(map));
+        route.createPolylines({{polylineOptions:{{strokeColor:'#1a73e8',
+          strokeOpacity:.95,strokeWeight:6}}}}).forEach(line=>line.setMap(map));
         (route.path||[]).forEach(p=>bounds.extend(p));
         empty.textContent='';
-        if(!bounds.isEmpty())map.fitBounds(bounds,40);
+        const minutes=Math.max(1,Math.ceil(Number(route.durationMillis||0)/60000));
+        const kilometres=Number(route.distanceMeters||0)/1000;
+        if(minutes&&kilometres){{
+          const distanceText=kilometres.toLocaleString('es-CO',
+            {{minimumFractionDigits:1,maximumFractionDigits:1}})+' km';
+          document.getElementById('preview-duration').textContent=minutes+' min';
+          document.getElementById('preview-distance').textContent=distanceText;
+          summary.innerHTML=`${{minutes}} min <small>· ${{kilometres.toLocaleString('es-CO',
+            {{minimumFractionDigits:1,maximumFractionDigits:1}})}} km</small>`;
+          summary.classList.add('show');
+        }}
+        if(!bounds.isEmpty())map.fitBounds(bounds,54);
       }}catch(error){{
         console.error('No fue posible dibujar la vista previa de la ruta.',error);
         empty.textContent='La ruta exacta se calculará al analizar.';
@@ -286,9 +350,10 @@ async function initPrediRutaMap(){{
   document.getElementById('legend').classList.add('show');
   const info=new InfoWindow();
   const tramos=data.tramos||[];
-  const cantidadClima=Math.min(5,tramos.length);
-  const puntosClima=new Set(Array.from({{length:cantidadClima}},(_,i)=>
-    cantidadClima===1?0:Math.round(i*(tramos.length-1)/(cantidadClima-1))));
+  // Las etiquetas permanentes se reservan para los tramos destacados. El
+  // detalle de cualquier otro tramo sigue disponible al pulsar su línea.
+  const puntosClima=new Set(tramos.map((tramo,index)=>
+    tramo.prioridad_recorrido ? index : -1).filter(index=>index>=0).slice(0,3));
   tramos.forEach((tramo,index)=>{{
     const path=(tramo.puntos_polyline||[]).map(p=>({{lat:Number(p[0]),lng:Number(p[1])}}));
     if(!path.length)return;
@@ -303,17 +368,27 @@ async function initPrediRutaMap(){{
         title:'Cambio de tramo'}});
     }}
     const clima=tramo.clima||{{}},estado=tramo.estado_actor;
+    const ubicacion=tramo.ubicacion_tramo||tramo.ubicacion_sector||{{}};
+    const desde=ubicacion.desde||`${{path[0].lat.toFixed(5)}}, ${{path[0].lng.toFixed(5)}}`;
+    const hasta=ubicacion.hasta||`${{path[path.length-1].lat.toFixed(5)}}, ${{path[path.length-1].lng.toFixed(5)}}`;
+    const nivel=String(tramo.nivel_criticidad||'Bajo');
+    const etiquetaNivel=nivel==='Alto'?'Coincidencia alta':
+      (nivel==='Medio'?'Coincidencia media':'Sin hallazgo destacado');
+    const claseNivel=nivel==='Alto'?'high':(nivel==='Medio'?'medium':'low');
     let estadoHtml='';
-    if(estado?.probabilidades){{const p=estado.probabilidades;
-      estadoHtml='<hr><b>Estado condicional si ocurre un siniestro</b><br>'+ 
-        `Herido ${{(Number(p.HERIDO)*100).toFixed(0)}}% · Ileso ${{(Number(p.ILESO)*100).toFixed(0)}}% · Muerto ${{(Number(p.MUERTO)*100).toFixed(0)}}%`;}}
+    if(estado?.probabilidades&&estado?.estado_mas_probable){{
+      const clave=estado.estado_mas_probable;
+      const porcentaje=Number(estado.probabilidades[clave]||0)*100;
+      const nombre=String(clave).toLocaleLowerCase('es-CO');
+      estadoHtml=`<div class="route-popup-state"><b>Si ocurriera un siniestro:</b> ${{safe(nombre)}} sería el estado más compatible (${{porcentaje.toFixed(0)}}%).</div>`;
+    }}
     line.addListener('click',event=>{{
-      info.setContent(`<div style="font:13px Arial;line-height:1.55;max-width:310px;color:#263f4d">`+
-        `<b>Tramo ${{safe(tramo.tramo)}} · Nivel ${{safe(tramo.nivel_criticidad)}}</b><br>`+
-        `Hora estimada: ${{safe(tramo.hora_paso)}} · ${{safe(tramo.duracion)}}<br>`+
-        `Clima: ${{safe(clima.condicion)}} · ${{Number(clima.temperatura).toFixed(1)}} °C<br>`+
-        `Posibilidad de lluvia: ${{Number(clima.probabilidad_precipitacion).toFixed(0)}}%`+estadoHtml+
-        '<hr><small>Comparación relativa con patrones históricos; no es una probabilidad individual.</small></div>');
+      info.setContent(`<div class="route-popup">`+
+        `<div class="route-popup-head"><b>Tramo ${{safe(tramo.tramo)}}</b><span class="route-popup-level ${{claseNivel}}">${{safe(etiquetaNivel)}}</span></div>`+
+        `<div class="route-popup-route">${{safe(desde)}} → ${{safe(hasta)}}</div>`+
+        `<div class="route-popup-meta"><span>Hora de paso: <b>${{safe(tramo.hora_paso)}}</b> · ${{safe(tramo.duracion)}}</span>`+
+        `<span>${{safe(clima.condicion)}} · ${{Number(clima.temperatura).toFixed(1)}} °C · lluvia ${{Number(clima.probabilidad_precipitacion).toFixed(0)}}%</span></div>`+
+        estadoHtml+'<div class="route-popup-note">Comparación con patrones históricos; no es una probabilidad individual de accidente.</div></div>');
       info.setPosition(event.latLng);info.open({{map}});
     }});
     if(puntosClima.has(index)){{
@@ -327,7 +402,12 @@ async function initPrediRutaMap(){{
   const start=point(data.start),end=point(data.end);
   if(start)addPin(start,'A','#14777a','Origen');
   if(end)addPin(end,'B','#17324d','Destino');
-  if(!bounds.isEmpty())map.fitBounds(bounds,30);
+  if(!bounds.isEmpty()){{
+    map.fitBounds(bounds,{{top:22,right:22,bottom:52,left:22}});
+    google.maps.event.addListenerOnce(map,'idle',()=>{{
+      if(Number(map.getZoom())>16)map.setZoom(16);
+    }});
+  }}
   }}catch(error){{
     console.error('No fue posible iniciar el mapa de PrediRuta.',error);
     empty.innerHTML='<b>No pudimos cargar el mapa</b><br>'+safe(error?.message||
@@ -353,6 +433,7 @@ def mostrar_mapa_previo(
     destino: dict | None,
     salida: str,
     key: str,
+    height: int = 500,
 ) -> None:
     """Muestra origen, destino y una vista previa del recorrido."""
 
@@ -366,10 +447,12 @@ def mostrar_mapa_previo(
         "departureTime": salida,
         "component": key,
     }
-    components.html(_documento_mapa(api_key, datos), height=500, scrolling=False)
+    components.html(_documento_mapa(api_key, datos), height=height, scrolling=False)
 
 
-def mostrar_mapa_resultado(api_key: str, data: dict, key: str) -> None:
+def mostrar_mapa_resultado(
+    api_key: str, data: dict, key: str, height: int = 630
+) -> None:
     """Dibuja cada tramo con su color, horario, clima y estado condicional."""
 
     if not api_key:
@@ -385,4 +468,4 @@ def mostrar_mapa_resultado(api_key: str, data: dict, key: str) -> None:
         "end": {"lat": fin["latitude"], "lng": fin["longitude"]},
         "tramos": data["tramos"],
     }
-    components.html(_documento_mapa(api_key, datos), height=630, scrolling=False)
+    components.html(_documento_mapa(api_key, datos), height=height, scrolling=False)

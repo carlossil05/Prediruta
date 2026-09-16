@@ -10,10 +10,16 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import polyline
 from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
+
+# Permite ejecutar Uvicorn directamente en desarrollo. En Railway las
+# variables del servicio conservan prioridad sobre este archivo local.
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 from api.predictors import (
     metadata_estado,
@@ -24,6 +30,7 @@ from api.predictors import (
 from api.schemas import SolicitudRuta
 from api.services import (
     ServicioExternoError,
+    ajustar_tiempos_a_duracion_total,
     distancia_centroide_mas_cercano_km,
     obtener_clima_tramo,
     obtener_referencia_vial,
@@ -36,7 +43,6 @@ from api.utils import punto_medio_polyline, segundos_a_texto, segmentar_por_zona
 
 ZONA_BOGOTA = ZoneInfo("America/Bogota")
 DIAS_PRONOSTICO = 7
-ANTICIPACION_MINIMA = timedelta(minutes=5)
 # Las zonas se construyeron sobre el área urbana. Un margen de 2,5 km tolera
 # bordes de los clusters sin admitir atajos amplios por Cota o municipios vecinos.
 DISTANCIA_MAXIMA_CENTROIDE_KM = 2.5
@@ -74,10 +80,12 @@ def validar_horizonte(departure_time: datetime) -> None:
 
     ahora = datetime.now(ZONA_BOGOTA)
     fecha_maxima = ahora.date() + timedelta(days=DIAS_PRONOSTICO - 1)
-    if departure_time < ahora + ANTICIPACION_MINIMA:
+    # El selector trabaja con precisión de minutos. Aceptamos el minuto actual
+    # aunque, al enviar el formulario, ya hayan transcurrido algunos segundos.
+    if departure_time < ahora.replace(second=0, microsecond=0):
         raise HTTPException(
             status_code=422,
-            detail="La salida debe programarse al menos 5 minutos en el futuro.",
+            detail="La salida no puede estar en el pasado.",
         )
     if departure_time.date() > fecha_maxima:
         raise HTTPException(
@@ -128,6 +136,59 @@ def validar_puntos_solicitud(data: SolicitudRuta) -> None:
                     "cubierta por PrediRuta. Elige una ubicación dentro de la ciudad."
                 ),
             )
+
+
+def construir_ubicaciones_tramos(
+    contextos: list[dict], origen: str, destino: str
+) -> list[dict[str, str]]:
+    """Nombra los límites reales de todos los tramos en orden de recorrido.
+
+    El origen y el destino conservan los nombres seleccionados por el usuario.
+    Los límites internos se describen con geocodificación inversa. Si Google
+    Geocoding no responde, se muestran las coordenadas en vez de sustituirlas
+    por un nombre de zona que no le explica al usuario dónde está el tramo.
+    """
+
+    if not contextos:
+        return []
+
+    limites = [contextos[0]["puntos"][0]] + [
+        contexto["puntos"][-1] for contexto in contextos
+    ]
+    claves_internas = list(
+        dict.fromkeys(
+            (round(latitud, 5), round(longitud, 5))
+            for latitud, longitud in limites[1:-1]
+        )
+    )
+    nombres_internos: dict[tuple[float, float], str | None] = {}
+    if claves_internas:
+        with ThreadPoolExecutor(
+            max_workers=min(6, len(claves_internas))
+        ) as ejecutor:
+            nombres_internos = dict(
+                zip(
+                    claves_internas,
+                    ejecutor.map(
+                        lambda punto: obtener_referencia_vial(*punto),
+                        claves_internas,
+                    ),
+                )
+            )
+
+    nombres_limites = [origen]
+    for latitud, longitud in limites[1:-1]:
+        clave = (round(latitud, 5), round(longitud, 5))
+        nombres_limites.append(
+            nombres_internos.get(clave)
+            or f"{latitud:.5f}, {longitud:.5f}"
+        )
+    nombres_limites.append(destino)
+
+    return [
+        {"desde": nombres_limites[indice], "hasta": nombres_limites[indice + 1]}
+        for indice in range(len(contextos))
+    ]
 
 
 @app.get("/")
@@ -188,8 +249,9 @@ def predecir_ruta(data: SolicitudRuta):
 
         # Segunda consulta: los límites de los clusters se envían como waypoints.
         # Así Google calcula una duración específica para cada tramo.
-        tiempos_google = obtener_tiempos_google_por_tramo(
-            tramos, departure_time
+        tiempos_google = ajustar_tiempos_a_duracion_total(
+            obtener_tiempos_google_por_tramo(tramos, departure_time),
+            ruta_google["duracion_s"],
         )
 
         hora_acumulada = departure_time
@@ -198,14 +260,15 @@ def predecir_ruta(data: SolicitudRuta):
             hora_inicio = hora_acumulada
             hora_fin = hora_inicio + timedelta(seconds=tiempo["duracion_s"])
             punto_representativo = punto_medio_polyline(tramo["puntos"])
-            hora_representativa = hora_inicio + (hora_fin - hora_inicio) / 2
             contextos.append(
                 {
                     **tramo,
                     **tiempo,
                     "hora_inicio": hora_inicio,
                     "hora_fin": hora_fin,
-                    "hora_representativa": hora_representativa,
+                    # Google entrega la duración del leg A→A1. Su hora de
+                    # llegada a A1 es el momento usado por clima y modelos.
+                    "hora_modelo": hora_fin,
                     "punto_representativo": punto_representativo,
                 }
             )
@@ -217,7 +280,7 @@ def predecir_ruta(data: SolicitudRuta):
                 ejecutor.map(
                     lambda contexto: obtener_clima_tramo(
                         *contexto["punto_representativo"],
-                        contexto["hora_representativa"],
+                        contexto["hora_modelo"],
                     ),
                     contextos,
                 )
@@ -225,10 +288,10 @@ def predecir_ruta(data: SolicitudRuta):
 
         # Cada fila enviada al modelo usa su esquema productivo completo. El
         # ranking se calcula después de obtener todos los scores para destacar
-        # como máximo tres sectores detectados dentro de esta ruta.
+        # como máximo tres tramos detectados dentro de esta ruta.
         scores = [
             predecir_ocurrencia(
-                contexto["zona"], contexto["hora_representativa"], clima
+                contexto["zona"], contexto["hora_modelo"], clima
             )
             for contexto, clima in zip(contextos, climas)
         ]
@@ -252,27 +315,11 @@ def predecir_ruta(data: SolicitudRuta):
             for posicion, indice in enumerate(cinco_mayores, start=1)
         }
 
-        # Solo se geocodifican los extremos de los cinco sectores que verá el
-        # usuario en primer plano; estas etiquetas no intervienen en el modelo.
-        coordenadas_referencia = {
-            (round(contextos[indice]["puntos"][0][0], 5),
-             round(contextos[indice]["puntos"][0][1], 5))
-            for indice in cinco_mayores
-        } | {
-            (round(contextos[indice]["puntos"][-1][0], 5),
-             round(contextos[indice]["puntos"][-1][1], 5))
-            for indice in cinco_mayores
-        }
-        with ThreadPoolExecutor(max_workers=min(6, len(coordenadas_referencia))) as ejecutor:
-            nombres_referencia = dict(
-                zip(
-                    coordenadas_referencia,
-                    ejecutor.map(
-                        lambda punto: obtener_referencia_vial(*punto),
-                        coordenadas_referencia,
-                    ),
-                )
-            )
+        # Cada tramo recibe un origen y un destino comprensibles. Esto se hace
+        # para toda la ruta, no solo para los elementos destacados de la vista.
+        ubicaciones_tramos = construir_ubicaciones_tramos(
+            contextos, data.origen, data.destino
+        )
 
         perfil = data.perfil_actor.model_dump()
         detalle_tramos = []
@@ -282,28 +329,12 @@ def predecir_ruta(data: SolicitudRuta):
             indice = indice_cero + 1
             destacado = indice_cero in ranking_prioridad
             criticidad = clasificar_criticidad(score, destacado)
-            ubicacion_sector = None
-            if indice_cero in ranking_general:
-                punto_inicio = (
-                    round(contexto["puntos"][0][0], 5),
-                    round(contexto["puntos"][0][1], 5),
-                )
-                punto_fin = (
-                    round(contexto["puntos"][-1][0], 5),
-                    round(contexto["puntos"][-1][1], 5),
-                )
-                ubicacion_sector = {
-                    "desde": nombres_referencia.get(punto_inicio)
-                    or "Entrada al sector",
-                    "hasta": nombres_referencia.get(punto_fin)
-                    or "Salida del sector",
-                }
             estado_actor = None
             if destacado:
                 probabilidades_estado = predecir_estado_actor(
                     *contexto["punto_representativo"],
                     contexto["zona"],
-                    contexto["hora_representativa"],
+                    contexto["hora_modelo"],
                     perfil,
                 )
                 estado_actor = {
@@ -328,6 +359,7 @@ def predecir_ruta(data: SolicitudRuta):
                     "puntos_polyline": contexto["puntos"],
                     "hora_inicio": contexto["hora_inicio"].isoformat(),
                     "hora_fin": contexto["hora_fin"].isoformat(),
+                    "hora_modelo": contexto["hora_modelo"].isoformat(),
                     "hora_paso": (
                         f'{contexto["hora_inicio"].strftime("%H:%M")} - '
                         f'{contexto["hora_fin"].strftime("%H:%M")}'
@@ -345,7 +377,7 @@ def predecir_ruta(data: SolicitudRuta):
                     "patron_detectado": score >= UMBRAL_MODELO_OCURRENCIA,
                     "prioridad_recorrido": ranking_prioridad.get(indice_cero),
                     "ranking_recorrido": ranking_general.get(indice_cero),
-                    "ubicacion_sector": ubicacion_sector,
+                    "ubicacion_tramo": ubicaciones_tramos[indice_cero],
                     "nivel_criticidad": criticidad["nivel"],
                     "color": criticidad["color"],
                     "estado_actor": estado_actor,
@@ -354,7 +386,9 @@ def predecir_ruta(data: SolicitudRuta):
 
         score_maximo = max(t["score_criticidad"] for t in detalle_tramos)
         nivel_maximo = "Alto" if prioritarios else "Bajo"
-        duracion_total = sum(t["duracion_segundos"] for t in detalle_tramos)
+        # La ETA visible siempre corresponde a la ruta principal calculada por
+        # Google. El reparto por tramos ya cierra contra esta misma duración.
+        duracion_total = ruta_google["duracion_s"]
         return {
             "resumen": {
                 "distancia_total_km": round(ruta_google["distancia_m"] / 1000, 1),
@@ -370,7 +404,7 @@ def predecir_ruta(data: SolicitudRuta):
                 ),
                 "start_location": ruta_google["inicio"],
                 "end_location": ruta_google["fin"],
-                "fuente_tiempos": "Google Routes API con tráfico",
+                "fuente_tiempos": "Google Routes API con estimación alta de tráfico",
                 "fuente_clima": "Google Weather API",
             },
             "alcance": {
